@@ -84,8 +84,15 @@ class EbayClient:
                      "Content-Type": "application/x-www-form-urlencoded"},
             data={"grant_type": "client_credentials", "scope": OAUTH_SCOPE},
             timeout=20)
-        r.raise_for_status()
-        data = r.json()
+      if r.status_code != 200:
+    try:
+        detail = r.json()
+        reason = detail.get("error_description") or detail.get("error") or r.text[:200]
+    except Exception:
+        reason = r.text[:200]
+    raise RuntimeError(f"eBay token rejected (HTTP {r.status_code}): {reason}")
+data = r.json()
+
         self._token = data["access_token"]
         self._token_exp = time.time() + int(data.get("expires_in", 7200))
         return self._token
