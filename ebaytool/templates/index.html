@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Listing Doctor — Free eBay Listing Audit</title>
+<meta name="description" content="Paste your eBay listing URL. Get a 0–100 score with prioritized fixes for title, photos, pricing, and more.">
+<link rel="icon" type="image/png" href="/static/logo.png">
+<!-- Social share preview -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Listing Doctor">
+<meta property="og:title" content="Listing Doctor — Free eBay Listing Audit">
+<meta property="og:description" content="Paste your eBay listing URL. Get a 0–100 score with prioritized fixes for title, photos, pricing, and more.">
+<meta property="og:image" content="{{ site_url }}/static/logo.png">
+<meta property="og:url" content="{{ site_url }}/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Listing Doctor — Free eBay Listing Audit">
+<meta name="twitter:description" content="Paste your eBay listing URL. Get a 0–100 score with prioritized fixes.">
+<meta name="twitter:image" content="{{ site_url }}/static/logo.png">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🩺 Listing Doctor <span class="phase">eBay · Phase 1</span></h1>
+    <p class="sub">Paste an eBay listing URL. Get a 0–100 score + prioritized fixes.</p>
+    {% if mock_mode %}<p class="mocknote">Demo mode — add your eBay API key for live audits.</p>{% endif %}
+  </header>
+
+  <form id="audit-form">
+    <input id="url" type="text" placeholder="https://www.ebay.com/itm/…  or item ID" autocomplete="off">
+    <button type="submit" id="go">Audit listing</button>
+  </form>
+  <div id="err" class="err" hidden></div>
+  <div id="loading" class="loading" hidden><div class="spin"></div>Auditing…</div>
+
+  <section id="report" hidden>
+    <div class="scorecard">
+      <div class="dial"><span id="score">0</span></div>
+      <div><h2 id="rtitle"></h2><p id="summary" class="summary"></p>
+      <p class="meta"><a id="rurl" href="#" target="_blank" rel="noopener">View listing ↗</a>
+      <span id="rmode"></span> · <span id="rcomp"></span> comparables</p></div>
+    </div>
+
+    <h3>Prioritized fixes</h3>
+    <ol id="fixes" class="fixes"></ol>
+
+    <h3>All checks</h3>
+    <div id="checks" class="checks"></div>
+  </section>
+
+  <footer>Listing Doctor · Phase 1: eBay · Etsy / TikTok Shop / Walmart next</footer>
+</div>
+<script>
+const form = document.getElementById('audit-form');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = document.getElementById('url').value.trim();
+  const err = document.getElementById('err'), loading = document.getElementById('loading'),
+        report = document.getElementById('report');
+  err.hidden = true; report.hidden = true; loading.hidden = false;
+  try {
+    const r = await fetch('/api/audit', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Audit failed');
+    render(d);
+  } catch (ex) { err.textContent = ex.message; err.hidden = false; }
+  finally { loading.hidden = true; }
+});
+function render(d) {
+  document.getElementById('score').textContent = d.score;
+  document.getElementById('score').parentElement.dataset.band =
+    d.score >= 80 ? 'good' : d.score >= 60 ? 'ok' : d.score >= 40 ? 'meh' : 'bad';
+  document.getElementById('rtitle').textContent = d.title;
+  document.getElementById('summary').textContent = d.summary;
+  const ru = document.getElementById('rurl');
+  if (d.item_url) { ru.href = d.item_url; ru.hidden = false; } else ru.hidden = true;
+  document.getElementById('rmode').textContent = d.mode === 'mock' ? 'demo data' : 'live data';
+  document.getElementById('rcomp').textContent = d.comparables ?? 0;
+  const fx = document.getElementById('fixes'); fx.innerHTML = '';
+  if (!d.fixes.length) fx.innerHTML = '<li class="none">Nothing to fix — this listing is dialed in. 🎉</li>';
+  d.fixes.forEach(f => {
+    const li = document.createElement('li');
+    li.innerHTML = `<strong>#${f.priority} ${f.label}</strong><p>${f.fix}</p>`;
+    fx.appendChild(li);
+  });
+  const ck = document.getElementById('checks'); ck.innerHTML = '';
+  d.checks.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'check ' + c.status;
+    const badge = c.status === 'pass' ? '✓' : c.status === 'warn' ? '!' : '✕';
+    div.innerHTML = `<span class="badge">${badge}</span><div><strong>${c.label}</strong>
+      <p class="detail">${c.detail}</p><p class="fix">${c.fix}</p></div>`;
+    ck.appendChild(div);
+  });
+  document.getElementById('report').hidden = false;
+  document.getElementById('report').scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>
