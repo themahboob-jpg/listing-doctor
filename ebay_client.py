@@ -12,8 +12,7 @@ import requests
 
 TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE_BASE = "https://api.ebay.com/buy/browse/v1"
-OAUTH_SCOPE = "https://api.ebay.com/oauth/api_scope/buy.browse.readonly"
-
+OAUTH_SCOPE = "https://api.ebay.com/oauth/api_scope"
 # ---------------------------------------------------------------- mock data
 MOCK_ITEM = {
     "itemId": "v1|394118902100|0",
