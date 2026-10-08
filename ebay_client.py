@@ -23,11 +23,11 @@ MOCK_ITEM = {
     "condition": "Used",
     "conditionId": "3000",
     "categoryPath": "Cell Phones & Accessories|Cell Phones & Smartphones",
-    "image": {"imageUrl": [
-        "https://i.ebayimg.com/images/g/aaa1.jpg",
-        "https://i.ebayimg.com/images/g/aaa2.jpg",
-        "https://i.ebayimg.com/images/g/aaa3.jpg",
-    ]},
+    "image": {"imageUrl": "https://i.ebayimg.com/images/g/aaa1.jpg"},
+    "additionalImages": [
+        {"imageUrl": "https://i.ebayimg.com/images/g/aaa2.jpg"},
+        {"imageUrl": "https://i.ebayimg.com/images/g/aaa3.jpg"},
+    ],
     "shortDescription": "Apple iPhone 13, 128GB, Midnight. Fully unlocked, battery health 89%.",
     "description": "<p>Apple iPhone 13 128GB in Midnight. Phone is in excellent condition with "
                    "only light micro-scratches. Battery health 89%. Fully unlocked for all carriers. "
@@ -44,6 +44,8 @@ MOCK_ITEM = {
         {"shippingCostType": "FLAT_RATE", "shippingCost": {"value": "0.00", "currency": "USD"},
          "maxEstimatedDeliveryDate": "2026-10-10", "minEstimatedDeliveryDate": "2026-10-08"}
     ],
+    "returnTerms": {"returnsAccepted": True, "returnPeriod": {"value": "30", "unit": "DAY"}},
+    "itemLocation": {"city": "Austin", "country": "US"},
     "itemWebUrl": "https://www.ebay.com/itm/394118902100",
     "estimatedAvailabilities": [{"estimatedAvailabilityStatus": "IN_STOCK", "estimatedAvailableQuantity": 3}],
 }

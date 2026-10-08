@@ -17,6 +17,7 @@ WHY = {
     "specifics": "Most buyers filter by brand, size, color… empty specifics means you never appear in filtered search.",
     "price": "Buyers compare prices in one click — 20%+ off the median and you're either ignored or leaving cash behind.",
     "shipping": "Free shipping is one of eBay's strongest ranking signals, and buyers filter for it.",
+    "returns": "30-day returns get a search boost on eBay — 'no returns' quietly costs you visibility and buyer confidence.",
     "description": "Thin descriptions mean more questions, more returns, worse rank. Depth sells.",
     "seller": "Below 99% positive, buyers will pick a pricier competitor just to feel safe.",
     "condition": "Tons of buyers filter by condition before they ever see your listing.",
@@ -64,7 +65,18 @@ def analyze(item, similar_prices=None):
            " ".join(t_fixes) or "Title looks solid.", 20)
 
     # ---- 2. photos -------------------------------------------------------
-    imgs = ((item.get("image") or {}).get("imageUrl")) or []
+    # Real Browse API shape: image.imageUrl is a STRING (main photo) and
+    # additionalImages[] holds the rest. (Mock data uses a list — handle both.)
+    imgs = []
+    main = (item.get("image") or {}).get("imageUrl")
+    if isinstance(main, str) and main:
+        imgs.append(main)
+    elif isinstance(main, list):
+        imgs.extend([u for u in main if u])
+    for a in item.get("additionalImages") or []:
+        u = (a or {}).get("imageUrl")
+        if u:
+            imgs.append(u)
     n_img = len(imgs)
     if n_img == 0:
         s, f = "fail", "No photos at all — listings without photos barely sell. Add up to 12."
@@ -88,7 +100,7 @@ def analyze(item, similar_prices=None):
         s, f = "pass", f"{n_asp} specifics filled."
     _check(checks, "specifics", "Item specifics", s,
            f"{n_asp} specifics: " + ", ".join(a.get("name", "") for a in aspects[:6]),
-           f, 15)
+           f, 10)
 
     # ---- 4. price positioning ----------------------------------------------
     price = None
@@ -120,7 +132,7 @@ def analyze(item, similar_prices=None):
 
     # ---- 5. shipping --------------------------------------------------------
     ships = item.get("shippingOptions") or []
-    free, handling = False, None
+    free, cost_types = False, set()
     for sh in ships:
         cost = (sh.get("shippingCost") or {}).get("value")
         try:
@@ -128,16 +140,56 @@ def analyze(item, similar_prices=None):
                 free = True
         except (TypeError, ValueError):
             pass
+        ct = (sh.get("shippingCostType") or "").replace("_", " ").title()
+        if ct:
+            cost_types.add(ct)
+    loc = item.get("itemLocation") or {}
+    loc_str = ", ".join(x for x in [loc.get("city"), loc.get("country")] if x)
+    ship_detail = f"{len(ships)} option(s)"
+    if cost_types:
+        ship_detail += " (" + ", ".join(sorted(cost_types)) + ")"
+    if free:
+        ship_detail += " — free shipping"
+    if loc_str:
+        ship_detail += f" — ships from {loc_str}"
     if not ships:
-        s, f = "warn", "No shipping options visible via API — confirm free/fast shipping is set."
+        s, f = "warn", "No shipping options visible via API — confirm free/fast shipping is set on eBay."
     elif free:
         s, f = "pass", "Free shipping offered — a top conversion driver on eBay."
     else:
-        s, f = "warn", "No free shipping. Listings with free shipping win the buy box more often."
-    _check(checks, "shipping", "Shipping", s,
-           f"{len(ships)} option(s)" + (" — free shipping" if free else ""), f, 10)
+        s, f = "warn", ("No free shipping. Free shipping wins the buy box more often — "
+                        "or bake the cost into your price.")
+    _check(checks, "shipping", "Shipping", s, ship_detail, f, 10)
 
-    # ---- 6. description -------------------------------------------------------
+    # ---- 6. returns ---------------------------------------------------------
+    rt = item.get("returnTerms") or {}
+    accepted = rt.get("returnsAccepted")
+    period = rt.get("returnPeriod") or {}
+    try:
+        pval = int(str(period.get("value", "")).strip())
+    except (TypeError, ValueError):
+        pval = None
+    punit = str(period.get("unit") or "").upper()
+    if accepted is True and pval == 30 and punit.startswith("DAY"):
+        s, f = "pass", "30-day returns — eBay boosts these listings in search."
+        r_detail = "30-day returns accepted"
+    elif accepted is True and pval:
+        s, f = "warn", (f"Only {pval}-day returns. Switching to 30-day returns earns "
+                        "eBay's search boost and buyer confidence.")
+        r_detail = f"{pval}-day returns accepted"
+    elif accepted is False:
+        s, f = "warn", ("No returns accepted. Describe the condition precisely and photograph "
+                        "every flaw — buyer confidence drops without a return option.")
+        r_detail = "No returns accepted"
+    elif accepted is True:
+        s, f = "warn", "Returns accepted, but the return window isn't visible — confirm it's 30 days."
+        r_detail = "Returns accepted (window unclear)"
+    else:
+        s, f = "warn", "Couldn't read the returns policy via API — confirm it's set on eBay (30-day recommended)."
+        r_detail = "Returns policy not visible"
+    _check(checks, "returns", "Returns policy", s, r_detail, f, 5)
+
+    # ---- 7. description -------------------------------------------------------
     desc_words = len(_strip_html(item.get("description") or item.get("shortDescription") or "").split())
     if desc_words < 30:
         s, f = "fail", "Description is nearly empty — buyers bounce, search suffers. Write 150+ words."
@@ -148,7 +200,7 @@ def analyze(item, similar_prices=None):
         s, f = "pass", f"~{desc_words} words — solid."
     _check(checks, "description", "Description", s, f"~{desc_words} words", f, 10)
 
-    # ---- 7. seller trust -------------------------------------------------------
+    # ---- 8. seller trust --------------------------------------------------------
     seller = item.get("seller") or {}
     try:
         fb_pct = float(seller.get("feedbackPercentage", 0))
@@ -166,7 +218,7 @@ def analyze(item, similar_prices=None):
     _check(checks, "seller", "Seller trust", s,
            f"{seller.get('username', '?')} — {fb_pct}% ({fb_score})", f, 10)
 
-    # ---- 8. condition ------------------------------------------------------------
+    # ---- 9. condition -------------------------------------------------------------
     cond = (item.get("condition") or "").strip()
     if cond:
         s, f = "pass", f"Condition set: {cond}."
