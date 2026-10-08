@@ -4,87 +4,174 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Listing Doctor — Free eBay Listing Audit</title>
-<meta name="description" content="Paste your eBay listing URL. Get a 0–100 score with prioritized fixes for title, photos, pricing, and more.">
+<meta name="description" content="Paste your eBay listing link. Get a 0–100 health score + exactly what to fix — in seconds. Free.">
 <link rel="icon" type="image/png" href="/static/logo.png">
 <!-- Social share preview -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Listing Doctor">
 <meta property="og:title" content="Listing Doctor — Free eBay Listing Audit">
-<meta property="og:description" content="Paste your eBay listing URL. Get a 0–100 score with prioritized fixes for title, photos, pricing, and more.">
+<meta property="og:description" content="Paste your eBay listing link. Get a 0–100 health score + exactly what to fix — in seconds.">
 <meta property="og:image" content="{{ site_url }}/static/logo.png">
 <meta property="og:url" content="{{ site_url }}/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Listing Doctor — Free eBay Listing Audit">
-<meta name="twitter:description" content="Paste your eBay listing URL. Get a 0–100 score with prioritized fixes.">
+<meta name="twitter:description" content="Paste your eBay listing link. Get a 0–100 health score + exactly what to fix.">
 <meta name="twitter:image" content="{{ site_url }}/static/logo.png">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<div class="bg-glow"></div>
 <div class="wrap">
-  <header>
-    <h1>🩺 Listing Doctor <span class="phase">eBay · Phase 1</span></h1>
-    <p class="sub">Paste an eBay listing URL. Get a 0–100 score + prioritized fixes.</p>
-    {% if mock_mode %}<p class="mocknote">Demo mode — add your eBay API key for live audits.</p>{% endif %}
+
+  <header class="hero">
+    <div class="logo">🩺 <span>Listing Doctor</span></div>
+    <p class="eyebrow">FREE EBAY LISTING AUDIT</p>
+    <h1>Is your listing <span class="grad">sick?</span></h1>
+    <p class="sub">Paste your eBay link. Get a 0–100 health score + exactly what to fix.<br>Takes 10 seconds. No signup.</p>
+
+    <form id="audit-form" class="audit-form">
+      <input id="url" type="text" placeholder="https://www.ebay.com/itm/…  or item ID" autocomplete="off" inputmode="url">
+      <button type="submit" id="go">Diagnose it ⚡</button>
+    </form>
+    <button id="demo" class="demo-link" type="button">No listing handy? Try the demo →</button>
+    {% if mock_mode %}<p class="mocknote">🧪 Demo mode — connect eBay API keys for live audits.</p>{% endif %}
+
+    <div id="err" class="err" hidden></div>
+    <div id="loading" class="loading" hidden><div class="spin"></div><span>Diagnosing…</span></div>
   </header>
 
-  <form id="audit-form">
-    <input id="url" type="text" placeholder="https://www.ebay.com/itm/…  or item ID" autocomplete="off">
-    <button type="submit" id="go">Audit listing</button>
-  </form>
-  <div id="err" class="err" hidden></div>
-  <div id="loading" class="loading" hidden><div class="spin"></div>Auditing…</div>
-
-  <section id="report" hidden>
+  <section id="report" class="report" hidden>
     <div class="scorecard">
-      <div class="dial"><span id="score">0</span></div>
-      <div><h2 id="rtitle"></h2><p id="summary" class="summary"></p>
-      <p class="meta"><a id="rurl" href="#" target="_blank" rel="noopener">View listing ↗</a>
-      <span id="rmode"></span> · <span id="rcomp"></span> comparables</p></div>
+      <div class="dial" id="dial"><span id="score">0</span></div>
+      <div class="scoreinfo">
+        <h2 id="rtitle"></h2>
+        <p id="summary" class="summary"></p>
+        <p class="meta"><a id="rurl" href="#" target="_blank" rel="noopener">View listing ↗</a>
+        <span id="rmode"></span> · <span id="rcomp"></span> comparables</p>
+        <button id="copy" class="copy-btn" type="button">📋 Copy my score</button>
+      </div>
     </div>
 
-    <h3>Prioritized fixes</h3>
+    <h3>🔧 Top fixes <span class="hint">— do these in order</span></h3>
     <ol id="fixes" class="fixes"></ol>
 
-    <h3>All checks</h3>
+    <h3>✅ All checks</h3>
     <div id="checks" class="checks"></div>
   </section>
 
-  <footer>Listing Doctor · Phase 1: eBay · Etsy / TikTok Shop / Walmart next</footer>
+  <section class="faq">
+    <h3>Questions? 👇</h3>
+    <details>
+      <summary>What does the score actually mean?</summary>
+      <p>0–100 across 8 checks — title, photos, item specifics, price, shipping, description, seller trust, condition — weighted by how much each one moves sales.</p>
+    </details>
+    <details>
+      <summary>Is it really free?</summary>
+      <p>Yep. Free, no signup, no credit card. Paste a link, get your diagnosis.</p>
+    </details>
+    <details>
+      <summary>Where does the data come from?</summary>
+      <p>Live eBay data via the official eBay API. (If API keys aren't connected, you'll see clearly-labeled demo data instead.)</p>
+    </details>
+    <details>
+      <summary>Do you save my listing?</summary>
+      <p>Nope. We audit it and forget it — nothing is stored.</p>
+    </details>
+    <details>
+      <summary>Only eBay?</summary>
+      <p>eBay for now. Etsy, TikTok Shop and Walmart are next on the roadmap. 🗺️</p>
+    </details>
+  </section>
+
+  <footer>Made for sellers 📦 · Listing Doctor</footer>
 </div>
 <script>
 const form = document.getElementById('audit-form');
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const url = document.getElementById('url').value.trim();
-  const err = document.getElementById('err'), loading = document.getElementById('loading'),
+const goBtn = document.getElementById('go');
+const urlInput = document.getElementById('url');
+const demoBtn = document.getElementById('demo');
+
+async function runAudit(endpoint, body) {
+  const err = document.getElementById('err'),
+        loading = document.getElementById('loading'),
         report = document.getElementById('report');
   err.hidden = true; report.hidden = true; loading.hidden = false;
+  goBtn.disabled = true; urlInput.disabled = true; demoBtn.disabled = true;
+  // Hard timeout: never leave the spinner running forever.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 90000);
   try {
-    const r = await fetch('/api/audit', {method:'POST',
-      headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
+    const r = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body || {}),
+      signal: ctrl.signal
+    });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Audit failed');
     render(d);
-  } catch (ex) { err.textContent = ex.message; err.hidden = false; }
-  finally { loading.hidden = true; }
+  } catch (ex) {
+    err.textContent = ex.name === 'AbortError'
+      ? 'Taking too long — the server might be waking up. Wait a few seconds and try again. 😴'
+      : ex.message;
+    err.hidden = false;
+  } finally {
+    clearTimeout(timer);
+    loading.hidden = true;
+    goBtn.disabled = false; urlInput.disabled = false; demoBtn.disabled = false;
+  }
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const url = urlInput.value.trim();
+  if (!url) {
+    const err = document.getElementById('err');
+    err.textContent = 'Paste an eBay link or item ID first 👆';
+    err.hidden = false;
+    return;
+  }
+  runAudit('/api/audit', {url});
 });
+
+demoBtn.addEventListener('click', () => runAudit('/api/demo', {}));
+
+document.getElementById('copy').addEventListener('click', async (e) => {
+  const s = document.getElementById('score').textContent;
+  const t = document.getElementById('rtitle').textContent;
+  const txt = `My eBay listing scored ${s}/100 on Listing Doctor 🩺 "${t}" — check yours free!`;
+  try { await navigator.clipboard.writeText(txt); }
+  catch { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  e.target.textContent = 'Copied! 🎉';
+  setTimeout(() => e.target.textContent = '📋 Copy my score', 2000);
+});
+
 function render(d) {
-  document.getElementById('score').textContent = d.score;
-  document.getElementById('score').parentElement.dataset.band =
-    d.score >= 80 ? 'good' : d.score >= 60 ? 'ok' : d.score >= 40 ? 'meh' : 'bad';
+  const score = d.score;
+  document.getElementById('score').textContent = score;
+  const dial = document.getElementById('dial');
+  dial.style.setProperty('--p', score);
+  const band = score >= 80 ? 'good' : score >= 60 ? 'ok' : score >= 40 ? 'meh' : 'bad';
+  dial.dataset.band = band;
   document.getElementById('rtitle').textContent = d.title;
   document.getElementById('summary').textContent = d.summary;
   const ru = document.getElementById('rurl');
   if (d.item_url) { ru.href = d.item_url; ru.hidden = false; } else ru.hidden = true;
-  document.getElementById('rmode').textContent = d.mode === 'mock' ? 'demo data' : 'live data';
+  document.getElementById('rmode').textContent =
+    d.mode === 'live' ? '⚡ live eBay data' : '🧪 demo data';
   document.getElementById('rcomp').textContent = d.comparables ?? 0;
+
   const fx = document.getElementById('fixes'); fx.innerHTML = '';
-  if (!d.fixes.length) fx.innerHTML = '<li class="none">Nothing to fix — this listing is dialed in. 🎉</li>';
+  if (!d.fixes.length) {
+    fx.innerHTML = '<li class="none"><strong>This listing is dialed in. 🎉</strong><p>Nothing to fix — go touch grass.</p></li>';
+  }
   d.fixes.forEach(f => {
     const li = document.createElement('li');
-    li.innerHTML = `<strong>#${f.priority} ${f.label}</strong><p>${f.fix}</p>`;
+    const why = f.why ? `<details class="why"><summary>Why this matters 💡</summary><p>${f.why}</p></details>` : '';
+    li.innerHTML = `<div class="fixnum">#${f.priority}</div><div><strong>${f.label}</strong><p>${f.fix}</p>${why}</div>`;
     fx.appendChild(li);
   });
+
   const ck = document.getElementById('checks'); ck.innerHTML = '';
   d.checks.forEach(c => {
     const div = document.createElement('div');
@@ -94,8 +181,10 @@ function render(d) {
       <p class="detail">${c.detail}</p><p class="fix">${c.fix}</p></div>`;
     ck.appendChild(div);
   });
-  document.getElementById('report').hidden = false;
-  document.getElementById('report').scrollIntoView({behavior:'smooth'});
+
+  const rep = document.getElementById('report');
+  rep.hidden = false;
+  rep.scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 </script>
 </body>

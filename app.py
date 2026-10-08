@@ -6,7 +6,7 @@ Env:  EBAY_CLIENT_ID / EBAY_CLIENT_SECRET  (without them the app runs in mock/de
 import os
 from flask import Flask, request, jsonify, render_template
 
-from ebay_client import EbayClient
+from ebay_client import EbayClient, ListingNotFound, MOCK_ITEM, MOCK_SIMILAR_PRICES
 from analyzer import analyze
 
 app = Flask(__name__)
@@ -42,8 +42,21 @@ def audit():
         report["mode"] = got["mode"]
         report["comparables"] = sim["count"]
         return jsonify(report)
+    except ListingNotFound as e:
+        return jsonify({"error": str(e)}), 404
     except Exception as e:  # noqa: BLE001 - surface API errors cleanly
         return jsonify({"error": f"eBay lookup failed: {e}"}), 502
+
+
+@app.route("/api/demo", methods=["GET", "POST"])
+def demo():
+    """One-tap sample audit — always uses mock data, works in live mode too."""
+    item = dict(MOCK_ITEM)
+    item["title"] = f"{MOCK_ITEM['title']} (demo listing)"
+    report = analyze(item, list(MOCK_SIMILAR_PRICES))
+    report["mode"] = "demo"
+    report["comparables"] = len(MOCK_SIMILAR_PRICES)
+    return jsonify(report)
 
 
 @app.route("/api/health")

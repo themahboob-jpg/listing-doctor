@@ -10,6 +10,18 @@ from statistics import median
 
 TITLE_LIMIT = 80
 
+# One-line "why this matters" per check — shown in the UI under each fix.
+WHY = {
+    "title": "eBay matches buyer searches against your title first — a weak title means an invisible listing.",
+    "photos": "Buyers can't touch your product, so photos ARE the product. More angles = more trust = more sales.",
+    "specifics": "Most buyers filter by brand, size, color… empty specifics means you never appear in filtered search.",
+    "price": "Buyers compare prices in one click — 20%+ off the median and you're either ignored or leaving cash behind.",
+    "shipping": "Free shipping is one of eBay's strongest ranking signals, and buyers filter for it.",
+    "description": "Thin descriptions mean more questions, more returns, worse rank. Depth sells.",
+    "seller": "Below 99% positive, buyers will pick a pricier competitor just to feel safe.",
+    "condition": "Tons of buyers filter by condition before they ever see your listing.",
+}
+
 
 def _strip_html(html):
     text = re.sub(r"<[^>]+>", " ", html or "")
@@ -169,7 +181,8 @@ def analyze(item, similar_prices=None):
     score = round(earned / total_w * 100) if total_w else 0
 
     impact = {"fail": 0, "warn": 1, "pass": 2}
-    fixes = [{"priority": i + 1, "label": c["label"], "fix": c["fix"]}
+    fixes = [{"priority": i + 1, "label": c["label"], "fix": c["fix"],
+              "why": WHY.get(c["id"], "")}
              for i, c in enumerate(sorted(
                  [c for c in checks if c["status"] != "pass"],
                  key=lambda c: (impact[c["status"]], -c["weight"])))]

@@ -13,6 +13,7 @@ import requests
 TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE_BASE = "https://api.ebay.com/buy/browse/v1"
 OAUTH_SCOPE = "https://api.ebay.com/oauth/api_scope"
+
 # ---------------------------------------------------------------- mock data
 MOCK_ITEM = {
     "itemId": "v1|394118902100|0",
@@ -50,6 +51,10 @@ MOCK_ITEM = {
 # competitor prices for the mock item (used for price positioning)
 MOCK_SIMILAR_PRICES = [419.0, 435.5, 449.0, 409.99, 459.0, 429.0, 442.5, 415.0,
                         438.0, 425.0, 451.0, 418.5, 433.0, 447.0, 422.0]
+
+
+class ListingNotFound(Exception):
+    """eBay has no such listing (bad ID, or ended/removed)."""
 
 
 class EbayClient:
@@ -121,18 +126,27 @@ class EbayClient:
             item = dict(MOCK_ITEM)
             item["title"] = f"{MOCK_ITEM['title']} (demo data)"
             return {"item": item, "mode": "mock"}
-        s = (url_or_id or "").strip()
-        if s.startswith("v1|"):
-            rest_id = s
-        else:
-            rest_id = self.get_restful_id(self.parse_item_id(s))
-        # URL-encode the pipes in the RESTful id
-        rest_id_enc = rest_id.replace("|", "%7C")
         try:
-            item = self._get(f"/item/{rest_id_enc}")
-        except requests.HTTPError:
-            # fallback: some ids work directly
-            item = self._get(f"/item/{self.parse_item_id(s)}")
+            s = (url_or_id or "").strip()
+            if s.startswith("v1|"):
+                rest_id = s
+            else:
+                rest_id = self.get_restful_id(self.parse_item_id(s))
+            # URL-encode the pipes in the RESTful id
+            rest_id_enc = rest_id.replace("|", "%7C")
+            try:
+                item = self._get(f"/item/{rest_id_enc}")
+            except requests.HTTPError:
+                # fallback: some ids work directly
+                item = self._get(f"/item/{self.parse_item_id(s)}")
+        except requests.HTTPError as e:
+            status = e.response.status_code if e.response is not None else None
+            if status in (400, 404):
+                raise ListingNotFound(
+                    "Listing not found on eBay. Double-check the item ID — "
+                    "it may be a typo, or the listing may have ended or been removed."
+                ) from e
+            raise
         return {"item": item, "mode": "live"}
 
     def similar_prices(self, query, limit=50):
