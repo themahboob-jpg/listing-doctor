@@ -65,6 +65,40 @@
         <option value="used_good">Condition: Used – Good</option>
         <option value="for_parts">Condition: For parts / not working</option>
       </select>
+      <p class="gen-section">Listing details <span class="hint">— eBay requires these</span></p>
+      <input id="g_category" type="text" placeholder="eBay category (e.g. Cell Phones & Smartphones)" autocomplete="off">
+      <div class="gen-row">
+        <input id="g_price" type="text" inputmode="decimal" placeholder="Price in USD (e.g. 249)" autocomplete="off">
+        <input id="g_quantity" type="text" inputmode="numeric" placeholder="Quantity (1)" autocomplete="off">
+      </div>
+      <div class="gen-row">
+        <select id="g_handling">
+          <option value="">Handling time…</option>
+          <option value="1">Ships in 1 business day</option>
+          <option value="2">Ships in 2 business days</option>
+          <option value="3">Ships in 3 business days</option>
+          <option value="5">Ships in 5 business days</option>
+        </select>
+        <select id="g_shipping">
+          <option value="">Shipping…</option>
+          <option value="free">Free shipping</option>
+          <option value="flat">Flat rate</option>
+          <option value="calculated">Calculated</option>
+        </select>
+      </div>
+      <div class="gen-row">
+        <input id="g_shipcost" type="text" inputmode="decimal" placeholder="Flat shipping cost $ (if flat rate)" autocomplete="off" hidden>
+        <input id="g_weight" type="text" placeholder="Package weight (e.g. 1 lb 4 oz)" autocomplete="off">
+      </div>
+      <div class="gen-row">
+        <select id="g_returns">
+          <option value="">Returns…</option>
+          <option value="30">30-day returns</option>
+          <option value="14">14-day returns</option>
+          <option value="none">No returns</option>
+        </select>
+        <input id="g_shipsfrom" type="text" placeholder="Ships from (e.g. United States)" autocomplete="off">
+      </div>
       <textarea id="g_features" rows="3" placeholder="Key features — one per line&#10;(e.g. Unlocked&#10;Battery health 89%&#10;Original box included)"></textarea>
       <input id="g_included" type="text" placeholder="What's included (e.g. phone, box, cable)" autocomplete="off">
       <button type="submit" id="gen-go">Generate my listing ✨</button>
@@ -90,6 +124,13 @@
       <pre id="g_desc" class="gen-desc"></pre>
       <button id="copy-desc" class="copy-btn" type="button">📋 Copy description</button>
     </div>
+    <div class="gen-card">
+      <div class="gen-card-head"><strong>📦 Shipping &amp; returns</strong><span class="hint">paste into eBay's form</span></div>
+      <pre id="g_ship" class="gen-desc"></pre>
+      <button id="copy-ship" class="copy-btn" type="button">📋 Copy shipping block</button>
+    </div>
+    <h3>📋 Listing readiness</h3>
+    <ul id="g_readiness" class="readiness"></ul>
     <h3>💡 Tips</h3>
     <ul id="g_tips" class="gen-tips"></ul>
     <div class="dfy">
@@ -296,7 +337,16 @@ document.getElementById('gen-form').addEventListener('submit', async (e) => {
         color: document.getElementById('g_color').value,
         condition: document.getElementById('g_condition').value,
         features: document.getElementById('g_features').value,
-        included: document.getElementById('g_included').value
+        included: document.getElementById('g_included').value,
+        category: document.getElementById('g_category').value,
+        price: document.getElementById('g_price').value,
+        quantity: document.getElementById('g_quantity').value,
+        handling_time: document.getElementById('g_handling').value,
+        shipping_type: document.getElementById('g_shipping').value,
+        shipping_cost: document.getElementById('g_shipcost').value,
+        package_weight: document.getElementById('g_weight').value,
+        returns_option: document.getElementById('g_returns').value,
+        ships_from: document.getElementById('g_shipsfrom').value
       })
     });
     const d = await r.json();
@@ -323,6 +373,15 @@ function renderGen(d) {
     sp.appendChild(li);
   });
   document.getElementById('g_desc').textContent = d.description;
+  document.getElementById('g_ship').textContent = d.shipping_returns || '— fill the shipping fields above to generate this block —';
+  const rd = document.getElementById('g_readiness'); rd.innerHTML = '';
+  const icons = {ok: '✅', warn: '⚠️', missing: '❌'};
+  d.readiness.forEach(r => {
+    const li = document.createElement('li');
+    li.className = 'ready-' + r.status;
+    li.innerHTML = `<span class="ready-ico">${icons[r.status] || '•'}</span><span><strong>${r.label}:</strong> ${r.note}</span>`;
+    rd.appendChild(li);
+  });
   const tp = document.getElementById('g_tips'); tp.innerHTML = '';
   d.tips.forEach(t => {
     const li = document.createElement('li');
@@ -345,6 +404,13 @@ document.getElementById('copy-title').addEventListener('click', (e) =>
   copyText(document.getElementById('g_title').textContent, e.target));
 document.getElementById('copy-desc').addEventListener('click', (e) =>
   copyText(document.getElementById('g_desc').textContent, e.target));
+document.getElementById('copy-ship').addEventListener('click', (e) =>
+  copyText(document.getElementById('g_ship').textContent, e.target));
+
+// show flat-rate cost only when "flat" shipping is chosen
+document.getElementById('g_shipping').addEventListener('change', (e) => {
+  document.getElementById('g_shipcost').hidden = e.target.value !== 'flat';
+});
 
 function render(d) {
   const score = d.score;
