@@ -1,5 +1,6 @@
 /* Listing Doctor — Gen Z edition: dark + electric */
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 :root{
   --bg:#08080f;
   --card:rgba(255,255,255,.045);
