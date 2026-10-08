@@ -170,7 +170,7 @@ def analyze(item, similar_prices=None):
     except (TypeError, ValueError):
         pval = None
     punit = str(period.get("unit") or "").upper()
-    if accepted is True and pval == 30 and punit.startswith("DAY"):
+    if accepted is True and pval == 30 and ("DAY" in punit.upper() or not punit):
         s, f = "pass", "30-day returns — eBay boosts these listings in search."
         r_detail = "30-day returns accepted"
     elif accepted is True and pval:
