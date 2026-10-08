@@ -153,6 +153,8 @@ class EbayClient:
         self.mock = not (self.client_id and self.client_secret)
         self._token = None
         self._token_exp = 0
+        # last Shopping-fallback failure detail (for /api/health debugging)
+        self.last_shopping_debug = None
 
     # ------------------------------------------------------------- helpers
     @staticmethod
@@ -265,14 +267,29 @@ class EbayClient:
             "ItemID": legacy_id,
             "IncludeSelector": "Description,Details,ItemSpecifics,ShippingCosts",
         }
+
+        def fail(reason):
+            self.last_shopping_debug = reason[:300]
+            raise ListingNotFound(NOT_FOUND_MSG)
+
         try:
             r = requests.get(SHOPPING_URL, params=params, timeout=20)
-            r.raise_for_status()
+        except requests.RequestException as e:
+            fail("connection_error: %s" % type(e).__name__)
+        if r.status_code != 200:
+            fail("http_%d: %s" % (r.status_code, r.text[:120]))
+        try:
             data = r.json()
-        except (requests.RequestException, ValueError):
-            raise ListingNotFound(NOT_FOUND_MSG)
+        except ValueError:
+            fail("bad_json: %s" % r.text[:120])
         if data.get("Ack") not in ("Success", "Warning") or not data.get("Item"):
-            raise ListingNotFound(NOT_FOUND_MSG)
+            errs = data.get("Errors") or [{}]
+            e0 = errs[0] if isinstance(errs, list) else errs
+            fail("ack_%s code=%s msg=%s" % (
+                data.get("Ack"),
+                e0.get("ErrorCode"),
+                str(e0.get("LongMessage") or e0.get("Message"))[:160]))
+        self.last_shopping_debug = "ok"
         return _translate_shopping_item(data["Item"])
 
     def similar_prices(self, query, limit=50):
