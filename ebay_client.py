@@ -254,14 +254,39 @@ class EbayClient:
                 item = self._browse(f"/item/{self.parse_item_id(s)}")
             return {"item": item, "mode": "live"}
         except ListingNotFound:
-            pass  # try the Shopping API below
+            pass  # try the fallbacks below
+        # ---- variation-listing (item group) fallback ----------------------
+        # eBay error 11006 means the id is an item GROUP (multi-variation
+        # listing). Resolve via get_items_by_item_group and audit one variation.
+        if self.last_browse_debug and "11006" in self.last_browse_debug:
+            try:
+                if s.startswith("v1|"):
+                    group_id = s.split("|")[1]
+                else:
+                    group_id = self.parse_item_id(s)
+                item = self._resolve_item_group(group_id)
+                return {"item": item, "mode": "live",
+                        "note": "Multi-variation listing — auditing one variation."}
+            except (ListingNotFound, requests.HTTPError):
+                pass
         # ---- Shopping API fallback --------------------------------------
+        # (unreachable from some networks; kept as a last resort)
         if s.startswith("v1|"):
             legacy_id = s.split("|")[1]
         else:
             legacy_id = self.parse_item_id(s)
         item = self._shopping_item(legacy_id)
         return {"item": item, "mode": "live"}
+
+    def _resolve_item_group(self, group_id):
+        """item_group_id -> full getItem of the first variation."""
+        data = self._browse("/item/get_items_by_item_group",
+                            {"item_group_id": group_id})
+        items = data.get("items") or []
+        if not items or not (items[0] or {}).get("itemId"):
+            raise ListingNotFound(NOT_FOUND_MSG)
+        rest_id_enc = items[0]["itemId"].replace("|", "%7C")
+        return self._browse(f"/item/{rest_id_enc}")
 
     # -------------------------------------------------- shopping fallback
     def _shopping_item(self, legacy_id):

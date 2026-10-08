@@ -103,6 +103,7 @@ body{
 .scoreinfo{min-width:0}
 .scorecard h2{margin:0 0 8px;font-size:17px;line-height:1.4;overflow-wrap:anywhere}
 .summary{color:#d3d9e8;margin:0 0 10px;font-size:14.5px;line-height:1.55}
+.rnote{color:#9fb3d9;margin:0 0 10px;font-size:13px;font-style:italic}
 .meta{font-size:13px;color:var(--muted);margin:0 0 12px}
 .meta a{color:var(--cyan);text-decoration:none}
 .meta a:hover{text-decoration:underline}

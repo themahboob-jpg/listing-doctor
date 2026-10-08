@@ -146,6 +146,7 @@
       <div class="scoreinfo">
         <h2 id="rtitle"></h2>
         <p id="summary" class="summary"></p>
+        <p id="rnote" class="rnote" hidden></p>
         <p class="meta"><a id="rurl" href="#" target="_blank" rel="noopener">View listing ↗</a>
         <span id="rmode"></span> · <span id="rcomp"></span> comparables</p>
         <button id="copy" class="copy-btn" type="button">📋 Copy my score</button>
@@ -422,6 +423,9 @@ function render(d) {
   dial.dataset.band = band;
   document.getElementById('rtitle').textContent = d.title;
   document.getElementById('summary').textContent = d.summary;
+  const rnote = document.getElementById('rnote');
+  if (d.note) { rnote.textContent = d.note; rnote.hidden = false; }
+  else { rnote.hidden = true; }
   const ru = document.getElementById('rurl');
   if (d.item_url) { ru.href = d.item_url; ru.hidden = false; } else ru.hidden = true;
   document.getElementById('rmode').textContent =

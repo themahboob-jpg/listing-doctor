@@ -45,6 +45,8 @@ def audit():
         report = analyze(item, sim["prices"])
         report["mode"] = got["mode"]
         report["comparables"] = sim["count"]
+        if got.get("note"):
+            report["note"] = got["note"]
         return jsonify(report)
     except ListingNotFound as e:
         return jsonify({"error": str(e)}), 404
