@@ -155,6 +155,8 @@ class EbayClient:
         self._token_exp = 0
         # last Shopping-fallback failure detail (for /api/health debugging)
         self.last_shopping_debug = None
+        # last Browse API error detail (for /api/health debugging)
+        self.last_browse_debug = None
 
     # ------------------------------------------------------------- helpers
     @staticmethod
@@ -209,6 +211,12 @@ class EbayClient:
             return self._get(path, params)
         except requests.HTTPError as e:
             status = e.response.status_code if e.response is not None else None
+            body = ""
+            try:
+                body = e.response.text[:300] if e.response is not None else ""
+            except Exception:
+                pass
+            self.last_browse_debug = "http_%s %s %s" % (status, path, body)
             if status in (400, 404):
                 raise ListingNotFound(NOT_FOUND_MSG) from e
             raise

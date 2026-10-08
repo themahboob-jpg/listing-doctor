@@ -14,7 +14,7 @@ app = Flask(__name__)
 client = EbayClient()  # reads keys from env; mock mode if absent
 
 # Bump on every deploy — lets us verify which build is live via /api/health.
-APP_VERSION = "2026-10-08-b"
+APP_VERSION = "2026-10-08-c"
 
 # Public base URL of the deployed app (for social share previews).
 # Change if the subdomain/name differs.
@@ -77,7 +77,8 @@ def generate():
 def health():
     return jsonify({"ok": True, "mode": "mock" if client.mock else "live",
                     "version": APP_VERSION,
-                    "shopping_debug": client.last_shopping_debug})
+                    "shopping_debug": client.last_shopping_debug,
+                    "browse_debug": client.last_browse_debug})
 
 
 if __name__ == "__main__":
