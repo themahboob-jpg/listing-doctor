@@ -25,10 +25,16 @@
 
   <header class="hero">
     <div class="logo">🩺 <span>Listing Doctor</span></div>
-    <p class="eyebrow">FREE EBAY LISTING AUDIT</p>
+    <p class="eyebrow">FREE EBAY LISTING TOOLKIT</p>
     <h1>Is your listing <span class="grad">sick?</span></h1>
-    <p class="sub">Paste your eBay link. Get a 0–100 health score + exactly what to fix.<br>Takes 10 seconds. No signup.</p>
+    <p class="sub">Audit a live listing — or create a new one from scratch.<br>Takes 10 seconds. No signup.</p>
 
+    <div class="tabs">
+      <button class="tab active" data-mode="audit" type="button">🔍 Audit a listing</button>
+      <button class="tab" data-mode="create" type="button">✨ Create a listing</button>
+    </div>
+
+    <div id="audit-pane">
     <form id="audit-form" class="audit-form">
       <input id="url" type="text" placeholder="https://www.ebay.com/itm/…  or item ID" autocomplete="off" inputmode="url">
       <button type="submit" id="go">Diagnose it ⚡</button>
@@ -38,7 +44,60 @@
 
     <div id="err" class="err" hidden></div>
     <div id="loading" class="loading" hidden><div class="spin"></div><span>Diagnosing…</span></div>
+    </div>
+
+    <div id="create-pane" hidden>
+    <form id="gen-form" class="gen-form">
+      <input id="g_name" type="text" placeholder="Product name *  (e.g. iPhone 13)" autocomplete="off">
+      <div class="gen-row">
+        <input id="g_brand" type="text" placeholder="Brand (e.g. Apple)" autocomplete="off">
+        <input id="g_model" type="text" placeholder="Model (e.g. A2633)" autocomplete="off">
+      </div>
+      <div class="gen-row">
+        <input id="g_storage" type="text" placeholder="Storage / Size (e.g. 128GB)" autocomplete="off">
+        <input id="g_color" type="text" placeholder="Color (e.g. Midnight)" autocomplete="off">
+      </div>
+      <select id="g_condition">
+        <option value="new">Condition: New</option>
+        <option value="open_box">Condition: Open box</option>
+        <option value="refurbished">Condition: Certified refurbished</option>
+        <option value="used_excellent">Condition: Used – Excellent</option>
+        <option value="used_good">Condition: Used – Good</option>
+        <option value="for_parts">Condition: For parts / not working</option>
+      </select>
+      <textarea id="g_features" rows="3" placeholder="Key features — one per line&#10;(e.g. Unlocked&#10;Battery health 89%&#10;Original box included)"></textarea>
+      <input id="g_included" type="text" placeholder="What's included (e.g. phone, box, cable)" autocomplete="off">
+      <button type="submit" id="gen-go">Generate my listing ✨</button>
+    </form>
+    <div id="gen-err" class="err" hidden></div>
+    <div id="gen-loading" class="loading" hidden><div class="spin"></div><span>Writing…</span></div>
+    </div>
   </header>
+
+  <section id="gen-report" class="report" hidden>
+    <h3>✨ Your listing draft</h3>
+    <div class="gen-card">
+      <div class="gen-card-head"><strong>📝 Optimized title</strong><span id="g_chars" class="chars"></span></div>
+      <p id="g_title" class="gen-title"></p>
+      <button id="copy-title" class="copy-btn" type="button">📋 Copy title</button>
+    </div>
+    <div class="gen-card">
+      <div class="gen-card-head"><strong>📋 Item specifics</strong><span class="hint">paste these into eBay</span></div>
+      <ul id="g_specifics" class="gen-specs"></ul>
+    </div>
+    <div class="gen-card">
+      <div class="gen-card-head"><strong>📄 Description draft</strong></div>
+      <pre id="g_desc" class="gen-desc"></pre>
+      <button id="copy-desc" class="copy-btn" type="button">📋 Copy description</button>
+    </div>
+    <h3>💡 Tips</h3>
+    <ul id="g_tips" class="gen-tips"></ul>
+    <div class="dfy">
+      <div><strong>✍️ Want all your listings written for you?</strong>
+      <p>Titles, descriptions, specifics — done-for-you, optimized to sell.</p></div>
+      <a class="dfy-btn" href="https://mappackfix.com" target="_blank" rel="noopener">Write mine →</a>
+    </div>
+  </section>
 
   <section id="report" class="report" hidden>
     <div class="scorecard">
@@ -54,6 +113,23 @@
 
     <h3>🔧 Top fixes <span class="hint">— do these in order</span></h3>
     <ol id="fixes" class="fixes"></ol>
+
+    <div class="dfy">
+      <div><strong>🛠️ Don't want to DIY?</strong>
+      <p>Get every fix done for you — title rewrite, photo guide, pricing tune-up.</p></div>
+      <a class="dfy-btn" href="https://mappackfix.com" target="_blank" rel="noopener">Get my fixes done →</a>
+    </div>
+
+    <div class="emailcap">
+      <strong>📧 Want this report in your inbox?</strong>
+      <p>Plus the occasional seller tip. No spam, unsubscribe anytime.</p>
+      <form id="email-form">
+        <input type="email" id="email" placeholder="you@example.com" required autocomplete="email">
+        <input type="text" name="_gotcha" id="gotcha" style="display:none" tabindex="-1" autocomplete="off">
+        <button type="submit" id="email-go">Send me the report</button>
+      </form>
+      <p id="email-msg" class="email-msg" hidden></p>
+    </div>
 
     <h3>✅ All checks</h3>
     <div id="checks" class="checks"></div>
@@ -146,8 +222,133 @@ document.getElementById('copy').addEventListener('click', async (e) => {
   setTimeout(() => e.target.textContent = '📋 Copy my score', 2000);
 });
 
+// Email capture — reuses the MapPackFix Formspree form; `source` keeps
+// Listing Doctor signups distinguishable in the dashboard.
+let lastReport = null;
+document.getElementById('email-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const msg = document.getElementById('email-msg');
+  const btn = document.getElementById('email-go');
+  if (!email) return;
+  btn.disabled = true; msg.hidden = true;
+  try {
+    const r = await fetch('https://formspree.io/f/xbglpbap', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: JSON.stringify({
+        email: email,
+        source: 'listing-doctor',
+        _subject: 'New Listing Doctor report request',
+        _gotcha: document.getElementById('gotcha').value,
+        score: lastReport ? lastReport.score : '',
+        listing_title: lastReport ? lastReport.title : '',
+        item_url: (lastReport && lastReport.item_url) || ''
+      })
+    });
+    if (!r.ok) throw new Error('send failed');
+    msg.textContent = 'Done! Check your inbox 📬';
+    msg.className = 'email-msg ok';
+    document.getElementById('email').value = '';
+  } catch (ex) {
+    msg.textContent = 'Hmm, that didn\u2019t go through — try again in a bit.';
+    msg.className = 'email-msg bad';
+  } finally {
+    msg.hidden = false;
+    btn.disabled = false;
+  }
+});
+
+// ---- tabs: audit vs create ----
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  const mode = t.dataset.mode;
+  document.getElementById('audit-pane').hidden = mode !== 'audit';
+  document.getElementById('create-pane').hidden = mode !== 'create';
+  document.getElementById('report').hidden = true;
+  document.getElementById('gen-report').hidden = true;
+}));
+
+// ---- listing generator ----
+document.getElementById('gen-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('gen-err'),
+        loading = document.getElementById('gen-loading'),
+        rep = document.getElementById('gen-report'),
+        btn = document.getElementById('gen-go');
+  const name = document.getElementById('g_name').value.trim();
+  if (!name) {
+    err.textContent = 'Product name to batao 👆 (bina iske title nahi ban sakta)';
+    err.hidden = false;
+    return;
+  }
+  err.hidden = true; rep.hidden = true; loading.hidden = false; btn.disabled = true;
+  try {
+    const r = await fetch('/api/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        product_name: name,
+        brand: document.getElementById('g_brand').value,
+        model: document.getElementById('g_model').value,
+        storage: document.getElementById('g_storage').value,
+        color: document.getElementById('g_color').value,
+        condition: document.getElementById('g_condition').value,
+        features: document.getElementById('g_features').value,
+        included: document.getElementById('g_included').value
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Generation failed');
+    renderGen(d);
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.hidden = false;
+  } finally {
+    loading.hidden = true;
+    btn.disabled = false;
+  }
+});
+
+function renderGen(d) {
+  document.getElementById('g_title').textContent = d.title;
+  const ch = document.getElementById('g_chars');
+  ch.textContent = d.title_chars + '/80 chars';
+  ch.dataset.warn = d.title_chars < 60 ? 'true' : 'false';
+  const sp = document.getElementById('g_specifics'); sp.innerHTML = '';
+  d.specifics.forEach(s => {
+    const li = document.createElement('li');
+    li.innerHTML = `<strong>${s.name}:</strong> ${s.value}`;
+    sp.appendChild(li);
+  });
+  document.getElementById('g_desc').textContent = d.description;
+  const tp = document.getElementById('g_tips'); tp.innerHTML = '';
+  d.tips.forEach(t => {
+    const li = document.createElement('li');
+    li.textContent = t;
+    tp.appendChild(li);
+  });
+  const rep = document.getElementById('gen-report');
+  rep.hidden = false;
+  rep.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+async function copyText(txt, btn, doneLabel) {
+  try { await navigator.clipboard.writeText(txt); }
+  catch { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  const old = btn.textContent;
+  btn.textContent = doneLabel || 'Copied! 🎉';
+  setTimeout(() => btn.textContent = old, 2000);
+}
+document.getElementById('copy-title').addEventListener('click', (e) =>
+  copyText(document.getElementById('g_title').textContent, e.target));
+document.getElementById('copy-desc').addEventListener('click', (e) =>
+  copyText(document.getElementById('g_desc').textContent, e.target));
+
 function render(d) {
   const score = d.score;
+  lastReport = d;
   document.getElementById('score').textContent = score;
   const dial = document.getElementById('dial');
   dial.style.setProperty('--p', score);

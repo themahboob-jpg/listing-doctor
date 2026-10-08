@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify, render_template
 
 from ebay_client import EbayClient, ListingNotFound, MOCK_ITEM, MOCK_SIMILAR_PRICES
 from analyzer import analyze
+from generator import generate_listing
 
 app = Flask(__name__)
 client = EbayClient()  # reads keys from env; mock mode if absent
@@ -57,6 +58,16 @@ def demo():
     report["mode"] = "demo"
     report["comparables"] = len(MOCK_SIMILAR_PRICES)
     return jsonify(report)
+
+
+@app.route("/api/generate", methods=["POST"])
+def generate():
+    """Build an optimized title, specifics and description from product details."""
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        return jsonify(generate_listing(data))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/api/health")
