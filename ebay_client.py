@@ -14,6 +14,14 @@ TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE_BASE = "https://api.ebay.com/buy/browse/v1"
 OAUTH_SCOPE = "https://api.ebay.com/oauth/api_scope"
 
+# Fallback for listings the Browse API can't resolve (it 400s on some active
+# listings). The Shopping API takes the numeric ItemID directly and needs only
+# the app key — no OAuth.
+SHOPPING_URL = "https://open.api.ebay.com/shopping"
+
+NOT_FOUND_MSG = ("Listing not found on eBay. Double-check the item ID — "
+                 "it may be a typo, or the listing may have ended or been removed.")
+
 # ---------------------------------------------------------------- mock data
 MOCK_ITEM = {
     "itemId": "v1|394118902100|0",
@@ -53,6 +61,85 @@ MOCK_ITEM = {
 # competitor prices for the mock item (used for price positioning)
 MOCK_SIMILAR_PRICES = [419.0, 435.5, 449.0, 409.99, 459.0, 429.0, 442.5, 415.0,
                         438.0, 425.0, 451.0, 418.5, 433.0, 447.0, 422.0]
+
+
+def _translate_shopping_item(it):
+    """Shopping API GetSingleItem -> Browse-like item dict for the analyzer."""
+    def txt(v):
+        return str(v).strip() if v is not None else ""
+
+    pics = it.get("PictureURL") or []
+    if isinstance(pics, str):
+        pics = [pics]
+    pics = [p for p in pics if txt(p)]
+
+    specifics = []
+    nvl = ((it.get("ItemSpecifics") or {}).get("NameValueList")) or []
+    for nv in nvl:
+        vals = (nv or {}).get("Value") or []
+        if isinstance(vals, str):
+            vals = [vals]
+        name = txt(nv.get("Name"))
+        value = ", ".join(txt(v) for v in vals if txt(v))
+        if name:
+            specifics.append({"name": name, "value": value})
+
+    seller = it.get("Seller") or {}
+    try:
+        fb_score = int(float(txt(seller.get("FeedbackScore")) or 0))
+    except (TypeError, ValueError):
+        fb_score = 0
+
+    ships = []
+    for so in ((it.get("ShippingDetails") or {}).get("ShippingServiceOptions")) or []:
+        so = so or {}
+        cost = (so.get("ShippingServiceCost") or {})
+        cval = cost.get("Value", cost.get("_value"))
+        ccur = txt(cost.get("CurrencyID", cost.get("_currencyId")) or "USD")
+        free = txt(so.get("FreeShipping")).lower() == "true"
+        try:
+            cval = "0.00" if free else "%.2f" % float(txt(cval))
+        except (TypeError, ValueError):
+            cval = "0.00" if free else None
+        if cval is None:
+            continue
+        ships.append({"shippingCostType": "FLAT_RATE",
+                      "shippingCost": {"value": cval, "currency": ccur}})
+
+    rp = it.get("ReturnPolicy") or {}
+    ra = txt(rp.get("ReturnsAccepted")).lower().replace(" ", "")
+    accepted = bool(ra) and "notaccepted" not in ra
+    pval, punit = None, ""
+    m = re.match(r"days?_(\d+)", txt(rp.get("ReturnsWithin")), re.I)
+    if m:
+        pval, punit = m.group(1), "DAY"
+    else:
+        m = re.match(r"months?_(\d+)", txt(rp.get("ReturnsWithin")), re.I)
+        if m:
+            pval, punit = str(int(m.group(1)) * 30), "DAY"
+
+    price = it.get("CurrentPrice") or {}
+    pcur = txt(price.get("CurrencyID", price.get("_currencyId")) or "USD")
+
+    return {
+        "title": txt(it.get("Title")),
+        "price": {"value": txt(price.get("Value", price.get("_value"))),
+                  "currency": pcur},
+        "condition": txt(it.get("ConditionDisplayName")),
+        "image": {"imageUrl": pics[0] if pics else ""},
+        "additionalImages": [{"imageUrl": u} for u in pics[1:]],
+        "description": it.get("Description") or "",
+        "localizedAspects": specifics,
+        "seller": {"username": txt(seller.get("UserID")),
+                   "feedbackScore": fb_score,
+                   "feedbackPercentage": txt(seller.get("PositiveFeedbackPercent"))},
+        "shippingOptions": ships,
+        "returnTerms": {"returnsAccepted": accepted,
+                        "returnPeriod": {"value": pval or "", "unit": punit}},
+        "itemLocation": {"city": txt(it.get("Location")),
+                         "country": txt(it.get("Country"))},
+        "itemWebUrl": txt(it.get("ViewItemURLForNaturalSearch")),
+    }
 
 
 class ListingNotFound(Exception):
@@ -114,22 +201,36 @@ class EbayClient:
         return r.json()
 
     # ----------------------------------------------------------------- api
+    def _browse(self, path, params=None):
+        """Browse API GET with 400/404 mapped to ListingNotFound."""
+        try:
+            return self._get(path, params)
+        except requests.HTTPError as e:
+            status = e.response.status_code if e.response is not None else None
+            if status in (400, 404):
+                raise ListingNotFound(NOT_FOUND_MSG) from e
+            raise
+
     def get_restful_id(self, legacy_id):
         """legacy numeric id -> RESTful item id (v1|..|..)."""
         if self.mock:
             return MOCK_ITEM["itemId"]
-        data = self._get("/item/get_item_by_legacy_id",
-                         {"legacy_item_id": legacy_id})
+        data = self._browse("/item/get_item_by_legacy_id",
+                            {"legacy_item_id": legacy_id})
         return data["itemId"]
 
     def get_item(self, url_or_id):
-        """Full item detail for an eBay URL / legacy id / RESTful id."""
+        """Full item detail for an eBay URL / legacy id / RESTful id.
+
+        Primary: Browse API. Fallback: Shopping API (GetSingleItem), which
+        resolves some active listings the Browse API rejects.
+        """
         if self.mock:
             item = dict(MOCK_ITEM)
             item["title"] = f"{MOCK_ITEM['title']} (demo data)"
             return {"item": item, "mode": "mock"}
+        s = (url_or_id or "").strip()
         try:
-            s = (url_or_id or "").strip()
             if s.startswith("v1|"):
                 rest_id = s
             else:
@@ -137,19 +238,42 @@ class EbayClient:
             # URL-encode the pipes in the RESTful id
             rest_id_enc = rest_id.replace("|", "%7C")
             try:
-                item = self._get(f"/item/{rest_id_enc}")
+                item = self._browse(f"/item/{rest_id_enc}")
             except requests.HTTPError:
                 # fallback: some ids work directly
-                item = self._get(f"/item/{self.parse_item_id(s)}")
-        except requests.HTTPError as e:
-            status = e.response.status_code if e.response is not None else None
-            if status in (400, 404):
-                raise ListingNotFound(
-                    "Listing not found on eBay. Double-check the item ID — "
-                    "it may be a typo, or the listing may have ended or been removed."
-                ) from e
-            raise
+                item = self._browse(f"/item/{self.parse_item_id(s)}")
+            return {"item": item, "mode": "live"}
+        except ListingNotFound:
+            pass  # try the Shopping API below
+        # ---- Shopping API fallback --------------------------------------
+        if s.startswith("v1|"):
+            legacy_id = s.split("|")[1]
+        else:
+            legacy_id = self.parse_item_id(s)
+        item = self._shopping_item(legacy_id)
         return {"item": item, "mode": "live"}
+
+    # -------------------------------------------------- shopping fallback
+    def _shopping_item(self, legacy_id):
+        """GetSingleItem via the Shopping API; translated to Browse-like shape."""
+        params = {
+            "callname": "GetSingleItem",
+            "responseencoding": "JSON",
+            "appid": self.client_id,
+            "siteid": "0",
+            "version": "967",
+            "ItemID": legacy_id,
+            "IncludeSelector": "Description,Details,ItemSpecifics,ShippingCosts",
+        }
+        try:
+            r = requests.get(SHOPPING_URL, params=params, timeout=20)
+            r.raise_for_status()
+            data = r.json()
+        except (requests.RequestException, ValueError):
+            raise ListingNotFound(NOT_FOUND_MSG)
+        if data.get("Ack") not in ("Success", "Warning") or not data.get("Item"):
+            raise ListingNotFound(NOT_FOUND_MSG)
+        return _translate_shopping_item(data["Item"])
 
     def similar_prices(self, query, limit=50):
         """Competitor prices for price positioning (search API)."""
