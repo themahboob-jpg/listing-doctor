@@ -13,6 +13,9 @@ from generator import generate_listing
 app = Flask(__name__)
 client = EbayClient()  # reads keys from env; mock mode if absent
 
+# Bump on every deploy — lets us verify which build is live via /api/health.
+APP_VERSION = "2026-10-08-a"
+
 # Public base URL of the deployed app (for social share previews).
 # Change if the subdomain/name differs.
 SITE_URL = os.getenv("SITE_URL", "https://tool.mappackfix.com")
@@ -72,7 +75,8 @@ def generate():
 
 @app.route("/api/health")
 def health():
-    return jsonify({"ok": True, "mode": "mock" if client.mock else "live"})
+    return jsonify({"ok": True, "mode": "mock" if client.mock else "live",
+                    "version": APP_VERSION})
 
 
 if __name__ == "__main__":
