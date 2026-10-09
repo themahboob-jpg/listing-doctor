@@ -14,11 +14,41 @@ app = Flask(__name__)
 client = EbayClient()  # reads keys from env; mock mode if absent
 
 # Bump on every deploy — lets us verify which build is live via /api/health.
-APP_VERSION = "2026-10-08-c"
+APP_VERSION = "2026-10-08-d"
 
 # Public base URL of the deployed app (for social share previews).
 # Change if the subdomain/name differs.
 SITE_URL = os.getenv("SITE_URL", "https://tool.mappackfix.com")
+
+
+def _item_brief(item):
+    """Small product-facts payload so 'Fix My Listing' can pre-fill the generator."""
+    aspects = {}
+    for a in item.get("localizedAspects") or []:
+        n = (a.get("name") or "").strip().lower()
+        if n and n not in aspects:
+            aspects[n] = a.get("value") or ""
+
+    def pick(*names):
+        for n in names:
+            if aspects.get(n):
+                return aspects[n]
+        return ""
+
+    price = ""
+    try:
+        price = str((item.get("price") or {}).get("value") or "")
+    except (TypeError, ValueError):
+        pass
+    return {
+        "title": item.get("title") or "",
+        "brand": pick("brand"),
+        "model": pick("model", "mpn"),
+        "color": pick("color", "colour"),
+        "size": pick("storage", "capacity", "size"),
+        "condition": item.get("condition") or "",
+        "price": price,
+    }
 
 
 @app.route("/")
@@ -45,6 +75,7 @@ def audit():
         report = analyze(item, sim["prices"])
         report["mode"] = got["mode"]
         report["comparables"] = sim["count"]
+        report["item_brief"] = _item_brief(item)
         if got.get("note"):
             report["note"] = got["note"]
         return jsonify(report)
@@ -62,6 +93,7 @@ def demo():
     report = analyze(item, list(MOCK_SIMILAR_PRICES))
     report["mode"] = "demo"
     report["comparables"] = len(MOCK_SIMILAR_PRICES)
+    report["item_brief"] = _item_brief(item)
     return jsonify(report)
 
 
@@ -78,9 +110,7 @@ def generate():
 @app.route("/api/health")
 def health():
     return jsonify({"ok": True, "mode": "mock" if client.mock else "live",
-                    "version": APP_VERSION,
-                    "shopping_debug": client.last_shopping_debug,
-                    "browse_debug": client.last_browse_debug})
+                    "version": APP_VERSION})
 
 
 if __name__ == "__main__":

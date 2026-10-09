@@ -31,7 +31,8 @@ def _strip_html(html):
 
 def _check(checks, cid, label, status, detail, fix, weight):
     checks.append({"id": cid, "label": label, "status": status,
-                   "detail": detail, "fix": fix, "weight": weight})
+                   "detail": detail, "fix": fix, "weight": weight,
+                   "why": WHY.get(cid, "")})
 
 
 def analyze(item, similar_prices=None):

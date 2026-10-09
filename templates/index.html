@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Listing Doctor — Free eBay Listing Audit</title>
-<meta name="description" content="Paste your eBay listing link. Get a 0–100 health score + exactly what to fix — in seconds. Free.">
+<meta name="description" content="Is your eBay listing losing sales? Paste the link — get a free 0–100 health score and exactly what to fix. No signup.">
 <link rel="icon" type="image/png" href="/static/logo.png">
 <!-- Social share preview -->
 <meta property="og:type" content="website">
@@ -26,8 +26,9 @@
   <header class="hero">
     <div class="logo">🩺 <span>Listing Doctor</span></div>
     <p class="eyebrow">FREE EBAY LISTING TOOLKIT</p>
-    <h1>Is your listing <span class="grad">sick?</span></h1>
-    <p class="sub">Audit a live listing — or create a new one from scratch.<br>Takes 10 seconds. No signup.</p>
+    <h1>Is Your eBay Listing <span class="grad">Losing Sales?</span></h1>
+    <p class="sub">Paste your eBay listing URL and Listing Doctor will identify the biggest problems hurting your listing — and tell you exactly what to fix.</p>
+    <p class="trust">Free • No Signup • No Credit Card</p>
 
     <div class="tabs">
       <button class="tab active" data-mode="audit" type="button">🔍 Audit a listing</button>
@@ -141,6 +142,7 @@
   </section>
 
   <section id="report" class="report" hidden>
+    <div id="data-banner" class="data-banner" hidden></div>
     <div class="scorecard">
       <div class="dial" id="dial"><span id="score">0</span></div>
       <div class="scoreinfo">
@@ -152,6 +154,8 @@
         <button id="copy" class="copy-btn" type="button">📋 Copy my score</button>
       </div>
     </div>
+
+    <button id="fix-my-listing" class="fixbtn" type="button" hidden>✨ Fix My Listing — generate the optimized version</button>
 
     <h3>🔧 Top fixes <span class="hint">— do these in order</span></h3>
     <ol id="fixes" class="fixes"></ol>
@@ -174,6 +178,7 @@
     </div>
 
     <h3>✅ All checks</h3>
+    <p class="score-note">Score = sum of check weights (out of 100): ✓ full weight · ! half weight · ✕ zero.</p>
     <div id="checks" class="checks"></div>
   </section>
 
@@ -313,8 +318,12 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 }));
 
 // ---- listing generator ----
-document.getElementById('gen-form').addEventListener('submit', async (e) => {
+document.getElementById('gen-form').addEventListener('submit', (e) => {
   e.preventDefault();
+  runGenerate();
+});
+
+async function runGenerate() {
   const err = document.getElementById('gen-err'),
         loading = document.getElementById('gen-loading'),
         rep = document.getElementById('gen-report'),
@@ -360,6 +369,41 @@ document.getElementById('gen-form').addEventListener('submit', async (e) => {
     loading.hidden = true;
     btn.disabled = false;
   }
+}
+
+// ---- Fix My Listing: audit -> generator bridge ----
+function mapCondition(c) {
+  const s = (c || '').toLowerCase();
+  if (s.includes('open box')) return 'open_box';
+  if (s.includes('refurb')) return 'refurbished';
+  if (s.includes('parts')) return 'for_parts';
+  if (s.includes('excellent')) return 'used_excellent';
+  if (s.includes('used')) return 'used_good';
+  return 'new';
+}
+
+document.getElementById('fix-my-listing').addEventListener('click', () => {
+  const b = lastReport && lastReport.item_brief;
+  if (!b || !b.title) return;
+  // switch to the create tab
+  document.querySelectorAll('.tab').forEach(x =>
+    x.classList.toggle('active', x.dataset.mode === 'create'));
+  document.getElementById('audit-pane').hidden = true;
+  document.getElementById('create-pane').hidden = false;
+  document.getElementById('report').hidden = true;
+  document.getElementById('gen-report').hidden = true;
+  // pre-fill from the audited listing (policies left blank on purpose —
+  // the generator only promises what the seller actually enters)
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+  set('g_name', b.title);
+  set('g_brand', b.brand);
+  set('g_model', b.model);
+  set('g_color', b.color);
+  set('g_storage', b.size);
+  set('g_price', b.price);
+  document.getElementById('g_condition').value = mapCondition(b.condition);
+  window.scrollTo({top: 0, behavior: 'smooth'});
+  runGenerate();
 });
 
 function renderGen(d) {
@@ -432,6 +476,18 @@ function render(d) {
     d.mode === 'live' ? '⚡ live eBay data' : '🧪 demo data';
   document.getElementById('rcomp').textContent = d.comparables ?? 0;
 
+  // live / demo banner — never show a score without saying which data it came from
+  const banner = document.getElementById('data-banner');
+  if (d.mode === 'live') {
+    banner.className = 'data-banner live';
+    banner.innerHTML = '⚡ <strong>Live eBay data</strong> — this audit ran on the real, current listing.';
+  } else {
+    banner.className = 'data-banner demo';
+    banner.innerHTML = '🧪 <strong>Demo data</strong> — illustrative sample, not your listing. ' +
+      'A demo score is not a diagnosis — audit a real listing for the truth.';
+  }
+  banner.hidden = false;
+
   const fx = document.getElementById('fixes'); fx.innerHTML = '';
   if (!d.fixes.length) {
     fx.innerHTML = '<li class="none"><strong>This listing is dialed in. 🎉</strong><p>Nothing to fix — go touch grass.</p></li>';
@@ -448,10 +504,15 @@ function render(d) {
     const div = document.createElement('div');
     div.className = 'check ' + c.status;
     const badge = c.status === 'pass' ? '✓' : c.status === 'warn' ? '!' : '✕';
-    div.innerHTML = `<span class="badge">${badge}</span><div><strong>${c.label}</strong>
-      <p class="detail">${c.detail}</p><p class="fix">${c.fix}</p></div>`;
+    const whyLine = c.why ? `<p class="why-line">💡 ${c.why}</p>` : '';
+    div.innerHTML = `<span class="badge">${badge}</span><div><strong>${c.label}</strong>` +
+      `<span class="weight">${c.weight}/100</span>` +
+      `<p class="detail">${c.detail}</p><p class="fix">${c.fix}</p>${whyLine}</div>`;
     ck.appendChild(div);
   });
+
+  const fixBtn = document.getElementById('fix-my-listing');
+  fixBtn.hidden = !(d.item_brief && d.item_brief.title);
 
   const rep = document.getElementById('report');
   rep.hidden = false;
