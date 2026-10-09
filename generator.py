@@ -192,10 +192,10 @@ def generate_listing(d):
                       else "Set it on eBay \u2014 late shipment hurts your seller rating."})
     readiness.append({"label": "Shipping", "status": "ok" if ship_label else "warn",
                       "note": (ship_label + (" ($%s)" % ship_cost if ship_key == "flat" and ship_cost else ""))
-                      if ship_label else "Free shipping wins the buy box; flat rate is fine for heavy items."})
+                      if ship_label else "Many buyers filter for free shipping; flat rate is fine for heavy items."})
     readiness.append({"label": "Returns", "status": "ok" if returns_label else "warn",
                       "note": returns_label if returns_label
-                      else "30-day returns get a search boost on eBay."})
+                      else "30-day returns are required for Top Rated Plus."})
 
     # ---- tips --------------------------------------------------------------
     tips = []

@@ -16,11 +16,13 @@ WHY = {
     "photos": "Buyers can't touch your product, so photos ARE the product. More angles = more trust = more sales.",
     "specifics": "Most buyers filter by brand, size, color… empty specifics means you never appear in filtered search.",
     "price": "Buyers compare prices in one click — 20%+ off the median and you're either ignored or leaving cash behind.",
-    "shipping": "Free shipping is one of eBay's strongest ranking signals, and buyers filter for it.",
-    "returns": "30-day returns get a search boost on eBay — 'no returns' quietly costs you visibility and buyer confidence.",
+    "shipping": "Many buyers filter for free shipping, and total cost (item + postage) drives the click.",
+    "returns": "30-day returns are required for Top Rated Plus and build buyer confidence — 'no returns' puts some buyers off.",
     "description": "Thin descriptions mean more questions, more returns, worse rank. Depth sells.",
-    "seller": "Below 99% positive, buyers will pick a pricier competitor just to feel safe.",
+    "seller": "Buyers compare feedback before buying — a lower positive % pushes them to a competitor.",
     "condition": "Tons of buyers filter by condition before they ever see your listing.",
+    "handling": "Fast dispatch (1 business day) is required for Top Rated Plus and sets buyer expectations.",
+    "identifiers": "UPC/EAN/MPN let eBay match your item to its catalog product, which feeds filters and external shopping search.",
 }
 
 
@@ -35,7 +37,19 @@ def _check(checks, cid, label, status, detail, fix, weight):
                    "why": WHY.get(cid, "")})
 
 
-def analyze(item, similar_prices=None):
+GTIN_KEYS = {"upc", "ean", "isbn", "gtin"}
+MPN_KEYS = {"mpn", "manufacturer part number"}
+
+
+def _norm(s):
+    return re.sub(r"[^a-z0-9]+", " ", str(s or "").lower()).strip()
+
+
+def _real(v):
+    return _norm(v) not in ("", "does not apply", "n a", "na", "unknown")
+
+
+def analyze(item, similar_prices=None, category_aspects=None):
     checks = []
     title = (item.get("title") or "").strip()
 
@@ -63,7 +77,7 @@ def analyze(item, similar_prices=None):
     detail = f"{len(title)}/{TITLE_LIMIT} chars, {len(words)} words" + \
              (f" — {'; '.join(t_issues)}" if t_issues else "")
     _check(checks, "title", "Title keywords", status, detail,
-           " ".join(t_fixes) or "Title looks solid.", 20)
+           " ".join(t_fixes) or "Title looks solid.", 18)
 
     # ---- 2. photos -------------------------------------------------------
     # Real Browse API shape: image.imageUrl is a STRING (main photo) and
@@ -87,7 +101,21 @@ def analyze(item, similar_prices=None):
         s, f = "warn", f"{n_img} photos is okay, but 8–12 converts better."
     else:
         s, f = "pass", f"{n_img} photos — good coverage."
-    _check(checks, "photos", "Photos", s, f"{n_img}/12 photos", f, 15)
+    size_note = ""
+    main_img = item.get("image") or {}
+    try:
+        longest = max(int(main_img.get("width") or 0), int(main_img.get("height") or 0))
+    except (TypeError, ValueError, AttributeError):
+        longest = 0
+    if longest:
+        size_note = f", main photo {longest}px"
+        if longest < 500:
+            s, f = "fail", (f"Main photo is only {longest}px on its longest side — eBay's "
+                            "minimum is 500px; 1600px+ is recommended (it enables zoom).")
+        elif longest < 1600 and s == "pass":
+            s, f = "warn", (f"{n_img} photos, but the main one is {longest}px on its longest "
+                            "side. Upload 1600px+ so buyers can zoom.")
+    _check(checks, "photos", "Photos", s, f"{n_img}/12 photos{size_note}", f, 14)
 
     # ---- 3. item specifics -------------------------------------------------
     aspects = item.get("localizedAspects") or []
@@ -99,9 +127,24 @@ def analyze(item, similar_prices=None):
                         "(brand, model, size, color…) — filters drive sales.")
     else:
         s, f = "pass", f"{n_asp} specifics filled."
-    _check(checks, "specifics", "Item specifics", s,
-           f"{n_asp} specifics: " + ", ".join(a.get("name", "") for a in aspects[:6]),
-           f, 10)
+    sp_detail = f"{n_asp} specifics: " + ", ".join(a.get("name", "") for a in aspects[:6])
+    if category_aspects and n_asp:
+        have = {_norm(a.get("name")) for a in aspects}
+        req_missing = [n for n in category_aspects.get("required", []) if _norm(n) not in have]
+        rec_all = category_aspects.get("recommended", [])
+        rec_missing = [n for n in rec_all if _norm(n) not in have]
+        rec_filled = len(rec_all) - len(rec_missing)
+        ratio = rec_filled / len(rec_all) if rec_all else 1.0
+        sp_detail += f" — category check: {rec_filled}/{len(rec_all)} recommended filled"
+        if req_missing:
+            s, f = "fail", ("Missing REQUIRED specifics for this category: "
+                            + ", ".join(req_missing[:5]) + ".")
+        elif rec_missing and ratio < 0.7:
+            s, f = "warn", (f"Only {rec_filled}/{len(rec_all)} recommended specifics filled. Add: "
+                            + ", ".join(rec_missing[:5]) + ".")
+        else:
+            s, f = "pass", f"All required and {rec_filled}/{len(rec_all)} recommended specifics filled."
+    _check(checks, "specifics", "Item specifics", s, sp_detail, f, 14)
 
     # ---- 4. price positioning ----------------------------------------------
     price = None
@@ -110,6 +153,7 @@ def analyze(item, similar_prices=None):
     except (TypeError, ValueError):
         pass
     prices = [p for p in (similar_prices or []) if p and p > 0]
+    price_weight = 14
     if price and len(prices) >= 5:
         med = median(prices)
         diff = (price - med) / med * 100
@@ -126,10 +170,11 @@ def analyze(item, similar_prices=None):
             s, f = "pass", f"${price:.2f} sits within ±20% of the market median (${med:.2f})."
         d = f"Your price ${price:.2f} vs median ${med:.2f} ({len(prices)} comparables)"
     elif price:
-        s, f, d = "warn", "Not enough comparable listings to judge price.", f"Price ${price:.2f}"
+        s, f, d = "warn", "Not enough comparable listings to judge price (not counted in score).", f"Price ${price:.2f}"
+        price_weight = 0
     else:
         s, f, d = "fail", "Could not read the price.", "Price missing"
-    _check(checks, "price", "Price positioning", s, d, f, 15)
+    _check(checks, "price", "Price positioning", s, d, f, price_weight)
 
     # ---- 5. shipping --------------------------------------------------------
     ships = item.get("shippingOptions") or []
@@ -158,8 +203,8 @@ def analyze(item, similar_prices=None):
     elif free:
         s, f = "pass", "Free shipping offered — a top conversion driver on eBay."
     else:
-        s, f = "warn", ("No free shipping. Free shipping wins the buy box more often — "
-                        "or bake the cost into your price.")
+        s, f = "warn", ("No free shipping. Many buyers filter for it — consider free shipping "
+                        "with the cost built into your price.")
     _check(checks, "shipping", "Shipping", s, ship_detail, f, 10)
 
     # ---- 6. returns ---------------------------------------------------------
@@ -172,11 +217,11 @@ def analyze(item, similar_prices=None):
         pval = None
     punit = str(period.get("unit") or "").upper()
     if accepted is True and pval == 30 and ("DAY" in punit.upper() or not punit):
-        s, f = "pass", "30-day returns — eBay boosts these listings in search."
+        s, f = "pass", "30-day returns — good for buyer confidence and Top Rated Plus."
         r_detail = "30-day returns accepted"
     elif accepted is True and pval:
-        s, f = "warn", (f"Only {pval}-day returns. Switching to 30-day returns earns "
-                        "eBay's search boost and buyer confidence.")
+        s, f = "warn", (f"Only {pval}-day returns. 30-day returns are required for "
+                        "Top Rated Plus and build buyer confidence.")
         r_detail = f"{pval}-day returns accepted"
     elif accepted is False:
         s, f = "warn", ("No returns accepted. Describe the condition precisely and photograph "
@@ -190,6 +235,27 @@ def analyze(item, similar_prices=None):
         r_detail = "Returns policy not visible"
     _check(checks, "returns", "Returns policy", s, r_detail, f, 5)
 
+    # ---- handling time ---------------------------------------------------------
+    try:
+        ht = int(item.get("handlingTimeDays"))
+    except (TypeError, ValueError):
+        ht = None
+    if ht is None:
+        _check(checks, "handling", "Handling time", "info",
+               "Not exposed by eBay's public API",
+               "Can't be read automatically — confirm in Seller Hub that handling time is "
+               "1 business day.", 0)
+    elif ht <= 1:
+        _check(checks, "handling", "Handling time", "pass",
+               f"{ht} business day(s)", "Ships within 1 business day — meets Top Rated Plus.", 5)
+    elif ht <= 3:
+        _check(checks, "handling", "Handling time", "warn", f"{ht} business days",
+               f"{ht}-day handling. Cut it to 1 business day if you can — it is part of "
+               "Top Rated Plus.", 5)
+    else:
+        _check(checks, "handling", "Handling time", "fail", f"{ht} business days",
+               f"{ht}-day handling is slow; buyers expect dispatch within 1–2 days.", 5)
+
     # ---- 7. description -------------------------------------------------------
     desc_words = len(_strip_html(item.get("description") or item.get("shortDescription") or "").split())
     if desc_words < 30:
@@ -200,6 +266,19 @@ def analyze(item, similar_prices=None):
     else:
         s, f = "pass", f"~{desc_words} words — solid."
     _check(checks, "description", "Description", s, f"~{desc_words} words", f, 10)
+
+    # ---- identifiers (UPC / EAN / MPN) -----------------------------------------
+    id_vals = {_norm(a.get("name")): a.get("value") for a in aspects}
+    has_gtin = _real(item.get("gtin")) or any(_real(v) for k, v in id_vals.items() if k in GTIN_KEYS)
+    has_mpn = _real(item.get("mpn")) or any(_real(v) for k, v in id_vals.items() if k in MPN_KEYS)
+    if has_gtin:
+        s, f, d = "pass", "UPC/EAN/ISBN present — helps eBay match your item to its catalog.", "GTIN present"
+    elif has_mpn:
+        s, f, d = "pass", "MPN set. Add the UPC/EAN as well if the product has one.", "MPN present, no GTIN"
+    else:
+        s, f, d = "warn", ("No UPC/EAN/MPN found. Add them if the product has one "
+                           "(handmade and vintage items can skip this)."), "No product identifiers"
+    _check(checks, "identifiers", "Product identifiers", s, d, f, 4)
 
     # ---- 8. seller trust --------------------------------------------------------
     seller = item.get("seller") or {}
@@ -217,7 +296,7 @@ def analyze(item, similar_prices=None):
     else:
         s, f = "warn", "No feedback data via API."
     _check(checks, "seller", "Seller trust", s,
-           f"{seller.get('username', '?')} — {fb_pct}% ({fb_score})", f, 10)
+           f"{seller.get('username', '?')} — {fb_pct}% ({fb_score})", f, 4)
 
     # ---- 9. condition -------------------------------------------------------------
     cond = (item.get("condition") or "").strip()
@@ -225,7 +304,7 @@ def analyze(item, similar_prices=None):
         s, f = "pass", f"Condition set: {cond}."
     else:
         s, f = "warn", "Condition field empty — buyers filter by condition."
-    _check(checks, "condition", "Condition", s, f"Condition: {cond or 'not set'}", f, 5)
+    _check(checks, "condition", "Condition", s, f"Condition: {cond or 'not set'}", f, 2)
 
     # ---- score ---------------------------------------------------------------------
     total_w = sum(c["weight"] for c in checks)
@@ -233,11 +312,11 @@ def analyze(item, similar_prices=None):
              sum(c["weight"] * 0.5 for c in checks if c["status"] == "warn")
     score = round(earned / total_w * 100) if total_w else 0
 
-    impact = {"fail": 0, "warn": 1, "pass": 2}
+    impact = {"fail": 0, "warn": 1, "pass": 2, "info": 3}
     fixes = [{"priority": i + 1, "label": c["label"], "fix": c["fix"],
               "why": WHY.get(c["id"], "")}
              for i, c in enumerate(sorted(
-                 [c for c in checks if c["status"] != "pass"],
+                 [c for c in checks if c["status"] not in ("pass", "info")],
                  key=lambda c: (impact[c["status"]], -c["weight"])))]
 
     if score >= 80:

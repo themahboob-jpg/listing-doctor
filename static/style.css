@@ -178,6 +178,7 @@ h3 .hint{font-weight:400;font-size:13.5px;color:var(--muted)}
 .check.pass .badge{background:rgba(163,230,53,.16);color:var(--lime)}
 .check.warn .badge{background:rgba(251,191,36,.16);color:#fbbf24}
 .check.fail .badge{background:rgba(239,68,68,.16);color:#f87171}
+.check.info .badge{background:rgba(148,163,184,.16);color:#94a3b8}
 .check .detail{color:var(--muted);font-size:12.5px;margin:5px 0;line-height:1.5}
 .check .fix{color:#c9d1e6;font-size:13px;margin:5px 0 0;line-height:1.5}
 

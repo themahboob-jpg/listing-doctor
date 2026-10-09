@@ -167,7 +167,7 @@
     </div>
 
     <h3>✅ All checks</h3>
-    <p class="score-note">Score = sum of check weights (out of 100): ✓ full weight · ! half weight · ✕ zero.</p>
+    <p class="score-note">Score = sum of check weights (out of 100): ✓ full weight · ! half weight · ✕ zero · i not scored.</p>
     <div id="checks" class="checks"></div>
   </section>
 
@@ -175,7 +175,7 @@
     <h3>Questions? 👇</h3>
     <details>
       <summary>What does the score actually mean?</summary>
-      <p>0–100 across 9 checks — title, photos, item specifics, price, shipping, returns, description, seller trust, condition — weighted by how much each one moves sales.</p>
+      <p>0–100 across up to 11 checks — title, photos, item specifics, price, shipping, returns, handling time, description, product identifiers, seller trust, condition — weighted by how much each one moves sales. Checks eBay's API can't show are marked “not scored”.</p>
     </details>
     <details>
       <summary>Is it really free?</summary>
@@ -260,6 +260,9 @@ document.getElementById('copy').addEventListener('click', async (e) => {
 
 // Email capture — reuses the MapPackFix Formspree form; `source` keeps
 // Listing Doctor signups distinguishable in the dashboard.
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 let lastReport = null;
 document.getElementById('email-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -403,7 +406,7 @@ function renderGen(d) {
   const sp = document.getElementById('g_specifics'); sp.innerHTML = '';
   d.specifics.forEach(s => {
     const li = document.createElement('li');
-    li.innerHTML = `<strong>${s.name}:</strong> ${s.value}`;
+    li.innerHTML = `<strong>${esc(s.name)}:</strong> ${esc(s.value)}`;
     sp.appendChild(li);
   });
   document.getElementById('g_desc').textContent = d.description;
@@ -412,8 +415,8 @@ function renderGen(d) {
   const icons = {ok: '✅', warn: '⚠️', missing: '❌'};
   d.readiness.forEach(r => {
     const li = document.createElement('li');
-    li.className = 'ready-' + r.status;
-    li.innerHTML = `<span class="ready-ico">${icons[r.status] || '•'}</span><span><strong>${r.label}:</strong> ${r.note}</span>`;
+    li.className = 'ready-' + esc(r.status);
+    li.innerHTML = `<span class="ready-ico">${icons[r.status] || '•'}</span><span><strong>${esc(r.label)}:</strong> ${esc(r.note)}</span>`;
     rd.appendChild(li);
   });
   const tp = document.getElementById('g_tips'); tp.innerHTML = '';
@@ -460,7 +463,7 @@ function render(d) {
   if (d.note) { rnote.textContent = d.note; rnote.hidden = false; }
   else { rnote.hidden = true; }
   const ru = document.getElementById('rurl');
-  if (d.item_url) { ru.href = d.item_url; ru.hidden = false; } else ru.hidden = true;
+  if (d.item_url && /^https?:\/\//i.test(d.item_url)) { ru.href = d.item_url; ru.hidden = false; } else ru.hidden = true;
   document.getElementById('rmode').textContent =
     d.mode === 'live' ? '⚡ live eBay data' : '🧪 demo data';
   document.getElementById('rcomp').textContent = d.comparables ?? 0;
@@ -483,20 +486,20 @@ function render(d) {
   }
   d.fixes.forEach(f => {
     const li = document.createElement('li');
-    const why = f.why ? `<details class="why"><summary>Why this matters 💡</summary><p>${f.why}</p></details>` : '';
-    li.innerHTML = `<div class="fixnum">#${f.priority}</div><div><strong>${f.label}</strong><p>${f.fix}</p>${why}</div>`;
+    const why = f.why ? `<details class="why"><summary>Why this matters 💡</summary><p>${esc(f.why)}</p></details>` : '';
+    li.innerHTML = `<div class="fixnum">#${esc(f.priority)}</div><div><strong>${esc(f.label)}</strong><p>${esc(f.fix)}</p>${why}</div>`;
     fx.appendChild(li);
   });
 
   const ck = document.getElementById('checks'); ck.innerHTML = '';
   d.checks.forEach(c => {
     const div = document.createElement('div');
-    div.className = 'check ' + c.status;
-    const badge = c.status === 'pass' ? '✓' : c.status === 'warn' ? '!' : '✕';
-    const whyLine = c.why ? `<p class="why-line">💡 ${c.why}</p>` : '';
-    div.innerHTML = `<span class="badge">${badge}</span><div><strong>${c.label}</strong>` +
-      `<span class="weight">${c.weight}/100</span>` +
-      `<p class="detail">${c.detail}</p><p class="fix">${c.fix}</p>${whyLine}</div>`;
+    div.className = 'check ' + esc(c.status);
+    const badge = c.status === 'pass' ? '✓' : c.status === 'warn' ? '!' : c.status === 'info' ? 'i' : '✕';
+    const whyLine = c.why ? `<p class="why-line">💡 ${esc(c.why)}</p>` : '';
+    div.innerHTML = `<span class="badge">${badge}</span><div><strong>${esc(c.label)}</strong>` +
+      `<span class="weight">${c.weight ? esc(c.weight) + '/100' : 'not scored'}</span>` +
+      `<p class="detail">${esc(c.detail)}</p><p class="fix">${esc(c.fix)}</p>${whyLine}</div>`;
     ck.appendChild(div);
   });
 

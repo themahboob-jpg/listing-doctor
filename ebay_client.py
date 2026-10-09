@@ -18,6 +18,9 @@ OAUTH_SCOPE = "https://api.ebay.com/oauth/api_scope"
 # listings). The Shopping API takes the numeric ItemID directly and needs only
 # the app key — no OAuth.
 SHOPPING_URL = "https://open.api.ebay.com/shopping"
+TAXONOMY_URL = ("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/"
+                "get_item_aspects_for_category")
+ASPECTS_TTL = 24 * 3600
 
 NOT_FOUND_MSG = ("Listing not found on eBay. Double-check the item ID — "
                  "it may be a typo, or the listing may have ended or been removed.")
@@ -30,8 +33,9 @@ MOCK_ITEM = {
     "price": {"value": "429.99", "currency": "USD"},
     "condition": "Used",
     "conditionId": "3000",
+    "categoryId": "9355",
     "categoryPath": "Cell Phones & Accessories|Cell Phones & Smartphones",
-    "image": {"imageUrl": "https://i.ebayimg.com/images/g/aaa1.jpg"},
+    "image": {"imageUrl": "https://i.ebayimg.com/images/g/aaa1.jpg", "width": 1200, "height": 1200},
     "additionalImages": [
         {"imageUrl": "https://i.ebayimg.com/images/g/aaa2.jpg"},
         {"imageUrl": "https://i.ebayimg.com/images/g/aaa3.jpg"},
@@ -56,6 +60,12 @@ MOCK_ITEM = {
     "itemLocation": {"city": "Austin", "country": "US"},
     "itemWebUrl": "https://www.ebay.com/itm/394118902100",
     "estimatedAvailabilities": [{"estimatedAvailabilityStatus": "IN_STOCK", "estimatedAvailableQuantity": 3}],
+}
+
+MOCK_CATEGORY_ASPECTS = {
+    "required": ["Brand", "Model"],
+    "recommended": ["Storage Capacity", "Color", "Network", "Operating System",
+                    "Screen Size", "Camera Resolution"],
 }
 
 # competitor prices for the mock item (used for price positioning)
@@ -139,6 +149,8 @@ def _translate_shopping_item(it):
         "itemLocation": {"city": txt(it.get("Location")),
                          "country": txt(it.get("Country"))},
         "itemWebUrl": txt(it.get("ViewItemURLForNaturalSearch")),
+        "categoryId": txt(it.get("PrimaryCategoryID")),
+        "handlingTimeDays": it.get("HandlingTime"),
     }
 
 
@@ -157,6 +169,8 @@ class EbayClient:
         self.last_shopping_debug = None
         # last Browse API error detail (for /api/health debugging)
         self.last_browse_debug = None
+        self.last_taxonomy_debug = None
+        self._aspects_cache = {}
 
     # ------------------------------------------------------------- helpers
     @staticmethod
@@ -235,6 +249,8 @@ class EbayClient:
         Primary: Browse API. Fallback: Shopping API (GetSingleItem), which
         resolves some active listings the Browse API rejects.
         """
+        self.last_browse_debug = None
+        self.last_shopping_debug = None
         if self.mock:
             item = dict(MOCK_ITEM)
             item["title"] = f"{MOCK_ITEM['title']} (demo data)"
@@ -325,14 +341,78 @@ class EbayClient:
         self.last_shopping_debug = "ok"
         return _translate_shopping_item(data["Item"])
 
-    def similar_prices(self, query, limit=50):
+    @staticmethod
+    def _parse_aspects(data):
+        required, recommended = [], []
+        for a in (data or {}).get("aspects") or []:
+            name = (a or {}).get("localizedAspectName")
+            cons = (a or {}).get("aspectConstraint") or {}
+            if not name:
+                continue
+            if cons.get("aspectRequired"):
+                required.append(name)
+            elif cons.get("aspectUsage") == "RECOMMENDED":
+                recommended.append(name)
+        return {"required": required, "recommended": recommended}
+
+    def category_aspects(self, category_id):
+        """Required / recommended item specifics for a category (Taxonomy API), or None."""
+        cid = str(category_id or "").strip()
+        if not cid.isdigit():
+            return None
+        if self.mock:
+            return dict(MOCK_CATEGORY_ASPECTS) if cid == MOCK_ITEM["categoryId"] else None
+        hit = self._aspects_cache.get(cid)
+        if hit and time.time() - hit[0] < ASPECTS_TTL:
+            return hit[1]
+        try:
+            r = requests.get(
+                TAXONOMY_URL,
+                headers={"Authorization": f"Bearer {self._app_token()}",
+                         "Accept": "application/json"},
+                params={"category_id": cid}, timeout=20)
+            r.raise_for_status()
+            result = self._parse_aspects(r.json())
+        except Exception as e:  # noqa: BLE001 - optional enrichment, never break an audit
+            self.last_taxonomy_debug = type(e).__name__
+            return None
+        if len(self._aspects_cache) > 300:
+            self._aspects_cache.clear()
+        self._aspects_cache[cid] = (time.time(), result)
+        return result
+
+    @staticmethod
+    def _condition_filter(condition):
+        c = (condition or "").strip().lower()
+        if not c:
+            return ""
+        if "open box" in c or "refurb" in c or "parts" in c:
+            return ""
+        if c.startswith("new"):
+            return "NEW"
+        if "used" in c or c in ("good", "very good", "acceptable", "excellent", "pre-owned"):
+            return "USED"
+        return ""
+
+    @staticmethod
+    def _trim_outliers(prices):
+        prices = sorted(p for p in prices if p and p > 0)
+        if len(prices) < 5:
+            return prices
+        mid = prices[len(prices) // 2]
+        return [p for p in prices if mid * 0.25 <= p <= mid * 4]
+
+    def similar_prices(self, query, limit=50, condition=None):
         """Competitor prices for price positioning (search API)."""
         if self.mock:
             return {"prices": list(MOCK_SIMILAR_PRICES), "mode": "mock",
                     "count": len(MOCK_SIMILAR_PRICES)}
+        flt = "buyingOptions:{FIXED_PRICE}"
+        cond = self._condition_filter(condition)
+        if cond:
+            flt += ",conditions:{%s}" % cond
         data = self._get("/item_summary/search",
-                         {"q": query, "limit": min(limit, 200),
-                          "filter": "buyingOptions:{FIXED_PRICE}"})
+                         {"q": query, "limit": min(limit, 200), "filter": flt})
         prices = []
         for it in data.get("itemSummaries", []):
             p = (it.get("price") or {}).get("value")
@@ -340,4 +420,5 @@ class EbayClient:
                 prices.append(float(p))
             except (TypeError, ValueError):
                 pass
+        prices = self._trim_outliers(prices)
         return {"prices": prices, "mode": "live", "count": len(prices)}
