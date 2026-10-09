@@ -17,7 +17,7 @@ venv/bin/python app.py                                            # -> http://lo
 |---|---|
 | `app.py` | Flask app: `/` UI, `/api/audit` JSON, `/api/health` |
 | `ebay_client.py` | OAuth client-credentials + Browse API (`getItemByLegacyId`, `getItem`, `search`) + mock fallback |
-| `analyzer.py` | Rule-based audit engine → score 0–100, 8 checks, prioritized fixes |
+| `analyzer.py` | Rule-based audit engine → score 0–100, 11 checks, prioritized fixes |
 | `templates/index.html` | Single-page UI |
 | `static/style.css` | Dark theme |
 | `SCOPE.md` | Full product scope, phases, free vs paid |
