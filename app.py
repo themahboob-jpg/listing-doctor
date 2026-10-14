@@ -51,7 +51,7 @@ def _security_headers(resp):
 client = EbayClient()  # reads keys from env; mock mode if absent
 
 # Bump on every deploy — lets us verify which build is live via /api/health.
-APP_VERSION = "2026-10-13-b"
+APP_VERSION = "2026-10-08-e"
 
 # Public base URL of the deployed app (for social share previews).
 # Change if the subdomain/name differs.
@@ -91,6 +91,16 @@ def _item_brief(item):
 @app.route("/")
 def index():
     return render_template("index.html", mock_mode=client.mock, site_url=SITE_URL)
+
+
+@app.route("/about")
+def about():
+    return render_template("about.html", site_url=SITE_URL)
+
+
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html", site_url=SITE_URL)
 
 
 @app.route("/api/audit", methods=["POST"])
