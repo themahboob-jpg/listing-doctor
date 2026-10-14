@@ -312,6 +312,9 @@ footer a:hover{color:var(--text);text-decoration:underline}
 .page li{margin:6px 0}
 .page .updated{font-size:.82rem;color:#5b6480}
 .page a{color:var(--cyan)}
+.contact-email{font-size:1.35rem;font-weight:700;margin:24px 0}
+.contact-email a{text-decoration:none}
+.contact-email a:hover{text-decoration:underline}
 
 /* ---------- mobile ---------- */
 @media (max-width:560px){

@@ -53,7 +53,7 @@ def _security_headers(resp):
 client = EbayClient()  # reads keys from env; mock mode if absent
 
 # Bump on every deploy — lets us verify which build is live via /api/health.
-APP_VERSION = "2026-10-13-e"
+APP_VERSION = "2026-10-13-f"
 
 # Public base URL of the deployed app (for social share previews).
 # Change if the subdomain/name differs.
@@ -164,6 +164,11 @@ def generate():
         return jsonify(generate_listing(data))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+
+
+@app.route("/contact")
+def contact():
+    return render_template("contact.html", site_url=SITE_URL)
 
 
 @app.route("/share")
