@@ -31,6 +31,8 @@ body{
 .hero{text-align:center;padding:48px 0 8px}
 .logo{font-size:15px;font-weight:700;letter-spacing:.02em;color:var(--muted);margin-bottom:22px}
 .logo span{color:var(--text)}
+a.logo{text-decoration:none;display:inline-block;cursor:pointer}
+a.logo:hover span{text-decoration:underline}
 .eyebrow{
   display:inline-block;font-size:11px;font-weight:800;letter-spacing:.22em;
   background:rgba(168,85,247,.14);border:1px solid rgba(168,85,247,.4);color:#d8b4fe;
