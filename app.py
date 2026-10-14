@@ -6,15 +6,17 @@ Env:  EBAY_CLIENT_ID / EBAY_CLIENT_SECRET  (without them the app runs in mock/de
 import os
 import time
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, make_response, redirect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
+from urllib.parse import urlencode
 
 from ebay_client import (EbayClient, ListingNotFound, MOCK_ITEM, MOCK_SIMILAR_PRICES,
                          MOCK_CATEGORY_ASPECTS)
 from analyzer import analyze
 from generator import generate_listing
+from share_card import make_score_card
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024
@@ -162,6 +164,40 @@ def generate():
         return jsonify(generate_listing(data))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+
+
+@app.route("/share")
+def share():
+    """Shareable score page — OG tags point at a generated score card image,
+    so the link unfurls with the score on WhatsApp/Facebook/X."""
+    try:
+        score = int(request.args.get("s", ""))
+    except (TypeError, ValueError):
+        return redirect("/", 302)
+    if not 0 <= score <= 100:
+        return redirect("/", 302)
+    title = (request.args.get("t") or "").strip()[:70]
+    q = urlencode({"s": score, "t": title})
+    return render_template("share.html", score=score, title=title,
+                           img_url=f"{SITE_URL}/share-img?{q}",
+                           page_url=f"{SITE_URL}/share?{q}", site_url=SITE_URL)
+
+
+@app.route("/share-img")
+@limiter.limit("30 per minute")
+def share_img():
+    """Render the 1200x630 score card PNG on the fly (nothing stored)."""
+    try:
+        score = int(request.args.get("s", ""))
+    except (TypeError, ValueError):
+        return jsonify({"error": "bad score"}), 400
+    if not 0 <= score <= 100:
+        return jsonify({"error": "bad score"}), 400
+    title = (request.args.get("t") or "").strip()[:70]
+    resp = make_response(make_score_card(score, title))
+    resp.headers["Content-Type"] = "image/png"
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
 
 
 @app.route("/api/health")

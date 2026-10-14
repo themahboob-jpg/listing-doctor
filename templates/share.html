@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My eBay listing scored {{ score }}/100 — Listing Doctor</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Listing Doctor">
+<meta property="og:title" content="My eBay listing scored {{ score }}/100 on Listing Doctor">
+<meta property="og:description" content="Is YOUR eBay listing losing sales? Get a free 0–100 audit — no signup.">
+<meta property="og:image" content="{{ img_url }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="{{ page_url }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="My eBay listing scored {{ score }}/100 on Listing Doctor">
+<meta name="twitter:description" content="Is YOUR eBay listing losing sales? Get a free 0–100 audit — no signup.">
+<meta name="twitter:image" content="{{ img_url }}">
+<meta http-equiv="refresh" content="2;url=/">
+<link rel="icon" type="image/png" href="/static/logo.png">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="bg-glow"></div>
+<div class="wrap">
+  <a class="logo" href="/" aria-label="Listing Doctor — back to homepage">🩺 <span>Listing Doctor</span></a>
+  <main class="page">
+    <h1>{{ score }}/100</h1>
+    {% if title %}<p>"{{ title }}"</p>{% endif %}
+    <p>Someone shared their Listing Doctor score with you.<br><a href="/">Audit your own listing free →</a></p>
+  </main>
+  <footer>Made for sellers 📦 · Listing Doctor<br><a href="/about">About</a> · <a href="/privacy">Privacy</a></footer>
+</div>
+</body>
+</html>

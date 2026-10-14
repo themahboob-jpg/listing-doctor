@@ -11,12 +11,14 @@
 <meta property="og:site_name" content="Listing Doctor">
 <meta property="og:title" content="Listing Doctor — Free eBay Listing Audit">
 <meta property="og:description" content="Paste your eBay listing link. Get a 0–100 health score + exactly what to fix — in seconds.">
-<meta property="og:image" content="{{ site_url }}/static/logo.png">
+<meta property="og:image" content="{{ site_url }}/static/og-banner.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:url" content="{{ site_url }}/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Listing Doctor — Free eBay Listing Audit">
 <meta name="twitter:description" content="Paste your eBay listing link. Get a 0–100 health score + exactly what to fix.">
-<meta name="twitter:image" content="{{ site_url }}/static/logo.png">
+<meta name="twitter:image" content="{{ site_url }}/static/og-banner.png">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -83,7 +85,7 @@
         <p id="rnote" class="rnote" hidden></p>
         <p class="meta"><a id="rurl" href="#" target="_blank" rel="noopener">View listing ↗</a>
         <span id="rmode"></span> · <span id="rcomp"></span> comparables</p>
-        <button id="copy" class="copy-btn" type="button">📋 Copy my score</button>
+        <button id="copy" class="copy-btn" type="button">📤 Share my score</button>
       </div>
     </div>
 
@@ -188,11 +190,12 @@ demoBtn.addEventListener('click', () => runAudit('/api/demo', {}));
 document.getElementById('copy').addEventListener('click', async (e) => {
   const s = document.getElementById('score').textContent;
   const t = document.getElementById('rtitle').textContent;
-  const txt = `My eBay listing scored ${s}/100 on Listing Doctor 🩺 "${t}" — check yours free!`;
+  const shareUrl = `${location.origin}/share?s=${encodeURIComponent(s)}&t=${encodeURIComponent(t.slice(0, 70))}`;
+  const txt = `My eBay listing scored ${s}/100 on Listing Doctor 🩺 "${t}" — is YOURS losing sales? Check free: ${shareUrl}`;
   try { await navigator.clipboard.writeText(txt); }
   catch { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
   e.target.textContent = 'Copied! 🎉';
-  setTimeout(() => e.target.textContent = '📋 Copy my score', 2000);
+  setTimeout(() => e.target.textContent = '📤 Share my score', 2000);
 });
 
 // Email capture — reuses the MapPackFix Formspree form; `source` keeps
