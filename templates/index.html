@@ -30,11 +30,6 @@
     <p class="sub">Paste your eBay listing URL and Listing Doctor will identify the biggest problems hurting your listing — and tell you exactly what to fix.</p>
     <p class="trust">Free • No Signup • No Credit Card</p>
 
-    <div class="tabs">
-      <button class="tab active" data-mode="audit" type="button">🔍 Audit a listing</button>
-      <button class="tab" data-mode="create" type="button">✨ Create a listing</button>
-    </div>
-
     <div id="audit-pane">
     <form id="audit-form" class="audit-form">
       <input id="url" type="text" placeholder="https://www.ebay.com/itm/…  or item ID" autocomplete="off" inputmode="url">
@@ -47,66 +42,8 @@
     <div id="loading" class="loading" hidden><div class="spin"></div><span>Diagnosing…</span></div>
     </div>
 
-    <div id="create-pane" hidden>
-    <form id="gen-form" class="gen-form">
-      <input id="g_name" type="text" placeholder="Product name *  (e.g. iPhone 13)" autocomplete="off">
-      <div class="gen-row">
-        <input id="g_brand" type="text" placeholder="Brand (e.g. Apple)" autocomplete="off">
-        <input id="g_model" type="text" placeholder="Model (e.g. A2633)" autocomplete="off">
-      </div>
-      <div class="gen-row">
-        <input id="g_storage" type="text" placeholder="Storage / Size (e.g. 128GB)" autocomplete="off">
-        <input id="g_color" type="text" placeholder="Color (e.g. Midnight)" autocomplete="off">
-      </div>
-      <select id="g_condition">
-        <option value="new">Condition: New</option>
-        <option value="open_box">Condition: Open box</option>
-        <option value="refurbished">Condition: Certified refurbished</option>
-        <option value="used_excellent">Condition: Used – Excellent</option>
-        <option value="used_good">Condition: Used – Good</option>
-        <option value="for_parts">Condition: For parts / not working</option>
-      </select>
-      <p class="gen-section">Listing details <span class="hint">— eBay requires these</span></p>
-      <input id="g_category" type="text" placeholder="eBay category (e.g. Cell Phones & Smartphones)" autocomplete="off">
-      <div class="gen-row">
-        <input id="g_price" type="text" inputmode="decimal" placeholder="Price in USD (e.g. 249)" autocomplete="off">
-        <input id="g_quantity" type="text" inputmode="numeric" placeholder="Quantity (1)" autocomplete="off">
-      </div>
-      <div class="gen-row">
-        <select id="g_handling">
-          <option value="">Handling time…</option>
-          <option value="1">Ships in 1 business day</option>
-          <option value="2">Ships in 2 business days</option>
-          <option value="3">Ships in 3 business days</option>
-          <option value="5">Ships in 5 business days</option>
-        </select>
-        <select id="g_shipping">
-          <option value="">Shipping…</option>
-          <option value="free">Free shipping</option>
-          <option value="flat">Flat rate</option>
-          <option value="calculated">Calculated</option>
-        </select>
-      </div>
-      <div class="gen-row">
-        <input id="g_shipcost" type="text" inputmode="decimal" placeholder="Flat shipping cost $ (if flat rate)" autocomplete="off" hidden>
-        <input id="g_weight" type="text" placeholder="Package weight (e.g. 1 lb 4 oz)" autocomplete="off">
-      </div>
-      <div class="gen-row">
-        <select id="g_returns">
-          <option value="">Returns…</option>
-          <option value="30">30-day returns</option>
-          <option value="14">14-day returns</option>
-          <option value="none">No returns</option>
-        </select>
-        <input id="g_shipsfrom" type="text" placeholder="Ships from (e.g. United States)" autocomplete="off">
-      </div>
-      <textarea id="g_features" rows="3" placeholder="Key features — one per line&#10;(e.g. Unlocked&#10;Battery health 89%&#10;Original box included)"></textarea>
-      <input id="g_included" type="text" placeholder="What's included (e.g. phone, box, cable)" autocomplete="off">
-      <button type="submit" id="gen-go">Generate my listing ✨</button>
-    </form>
     <div id="gen-err" class="err" hidden></div>
     <div id="gen-loading" class="loading" hidden><div class="spin"></div><span>Writing…</span></div>
-    </div>
   </header>
 
   <section id="gen-report" class="report" hidden>
@@ -298,57 +235,40 @@ document.getElementById('email-form').addEventListener('submit', async (e) => {
   }
 });
 
-// ---- tabs: audit vs create ----
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
-  const mode = t.dataset.mode;
-  document.getElementById('audit-pane').hidden = mode !== 'audit';
-  document.getElementById('create-pane').hidden = mode !== 'create';
-  document.getElementById('report').hidden = true;
-  document.getElementById('gen-report').hidden = true;
-}));
+// ---- Fix My Listing: audit -> generator bridge ----
+// (Standalone "Create a listing" tab removed 2026-10-13 — the generator now
+// runs directly from the audit's item_brief payload, no form needed.)
+function mapCondition(c) {
+  const s = (c || '').toLowerCase();
+  if (s.includes('open box')) return 'open_box';
+  if (s.includes('refurb')) return 'refurbished';
+  if (s.includes('parts')) return 'for_parts';
+  if (s.includes('excellent')) return 'used_excellent';
+  if (s.includes('used')) return 'used_good';
+  return 'new';
+}
 
-// ---- listing generator ----
-document.getElementById('gen-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  runGenerate();
-});
-
-async function runGenerate() {
+document.getElementById('fix-my-listing').addEventListener('click', async () => {
+  const b = lastReport && lastReport.item_brief;
+  if (!b || !b.title) return;
   const err = document.getElementById('gen-err'),
         loading = document.getElementById('gen-loading'),
         rep = document.getElementById('gen-report'),
-        btn = document.getElementById('gen-go');
-  const name = document.getElementById('g_name').value.trim();
-  if (!name) {
-    err.textContent = 'Product name to batao 👆 (bina iske title nahi ban sakta)';
-    err.hidden = false;
-    return;
-  }
+        btn = document.getElementById('fix-my-listing');
   err.hidden = true; rep.hidden = true; loading.hidden = false; btn.disabled = true;
+  window.scrollTo({top: 0, behavior: 'smooth'});
   try {
     const r = await fetch('/api/generate', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        product_name: name,
-        brand: document.getElementById('g_brand').value,
-        model: document.getElementById('g_model').value,
-        storage: document.getElementById('g_storage').value,
-        color: document.getElementById('g_color').value,
-        condition: document.getElementById('g_condition').value,
-        features: document.getElementById('g_features').value,
-        included: document.getElementById('g_included').value,
-        category: document.getElementById('g_category').value,
-        price: document.getElementById('g_price').value,
-        quantity: document.getElementById('g_quantity').value,
-        handling_time: document.getElementById('g_handling').value,
-        shipping_type: document.getElementById('g_shipping').value,
-        shipping_cost: document.getElementById('g_shipcost').value,
-        package_weight: document.getElementById('g_weight').value,
-        returns_option: document.getElementById('g_returns').value,
-        ships_from: document.getElementById('g_shipsfrom').value
+        product_name: b.title,
+        brand: b.brand || '',
+        model: b.model || '',
+        storage: b.size || '',
+        color: b.color || '',
+        condition: mapCondition(b.condition),
+        price: b.price || ''
       })
     });
     const d = await r.json();
@@ -361,41 +281,6 @@ async function runGenerate() {
     loading.hidden = true;
     btn.disabled = false;
   }
-}
-
-// ---- Fix My Listing: audit -> generator bridge ----
-function mapCondition(c) {
-  const s = (c || '').toLowerCase();
-  if (s.includes('open box')) return 'open_box';
-  if (s.includes('refurb')) return 'refurbished';
-  if (s.includes('parts')) return 'for_parts';
-  if (s.includes('excellent')) return 'used_excellent';
-  if (s.includes('used')) return 'used_good';
-  return 'new';
-}
-
-document.getElementById('fix-my-listing').addEventListener('click', () => {
-  const b = lastReport && lastReport.item_brief;
-  if (!b || !b.title) return;
-  // switch to the create tab
-  document.querySelectorAll('.tab').forEach(x =>
-    x.classList.toggle('active', x.dataset.mode === 'create'));
-  document.getElementById('audit-pane').hidden = true;
-  document.getElementById('create-pane').hidden = false;
-  document.getElementById('report').hidden = true;
-  document.getElementById('gen-report').hidden = true;
-  // pre-fill from the audited listing (policies left blank on purpose —
-  // the generator only promises what the seller actually enters)
-  const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
-  set('g_name', b.title);
-  set('g_brand', b.brand);
-  set('g_model', b.model);
-  set('g_color', b.color);
-  set('g_storage', b.size);
-  set('g_price', b.price);
-  document.getElementById('g_condition').value = mapCondition(b.condition);
-  window.scrollTo({top: 0, behavior: 'smooth'});
-  runGenerate();
 });
 
 function renderGen(d) {
@@ -443,12 +328,6 @@ document.getElementById('copy-desc').addEventListener('click', (e) =>
   copyText(document.getElementById('g_desc').textContent, e.target));
 document.getElementById('copy-ship').addEventListener('click', (e) =>
   copyText(document.getElementById('g_ship').textContent, e.target));
-
-// show flat-rate cost only when "flat" shipping is chosen
-document.getElementById('g_shipping').addEventListener('change', (e) => {
-  document.getElementById('g_shipcost').hidden = e.target.value !== 'flat';
-});
-
 function render(d) {
   const score = d.score;
   lastReport = d;

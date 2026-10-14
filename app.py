@@ -51,7 +51,7 @@ def _security_headers(resp):
 client = EbayClient()  # reads keys from env; mock mode if absent
 
 # Bump on every deploy — lets us verify which build is live via /api/health.
-APP_VERSION = "2026-10-08-e"
+APP_VERSION = "2026-10-13-a"
 
 # Public base URL of the deployed app (for social share previews).
 # Change if the subdomain/name differs.
