@@ -12,13 +12,13 @@ TITLE_LIMIT = 80
 
 # One-line "why this matters" per check — shown in the UI under each fix.
 WHY = {
-    "title": "eBay matches buyer searches against your title first — a weak title means an invisible listing.",
-    "photos": "Buyers can't touch your product, so photos ARE the product. More angles = more trust = more sales.",
-    "specifics": "Most buyers filter by brand, size, color… empty specifics means you never appear in filtered search.",
+    "title": "A relevant, specific title helps buyers understand the item and find matching listings; this check does not measure search ranking.",
+    "photos": "Clear photos help buyers assess the actual item, condition, included accessories and any flaws.",
+    "specifics": "Applicable item specifics help buyers filter and compare listings; required fields depend on the category.",
     "price": "Active asking prices provide context, but differences in product, condition, shipping and seller can make comparisons imperfect.",
     "shipping": "Many buyers filter for free shipping, and total cost (item + postage) drives the click.",
     "returns": "A clear return policy helps set buyer expectations. Top Rated Plus eligibility depends on additional seller and listing requirements.",
-    "description": "Thin descriptions mean more questions, more returns, worse rank. Depth sells.",
+    "description": "A clear description helps buyers understand condition and what is included; word count alone does not guarantee performance.",
     "seller": "Buyers compare feedback before buying — a lower positive % pushes them to a competitor.",
     "condition": "Tons of buyers filter by condition before they ever see your listing.",
     "handling": "Clear, realistic handling times set buyer expectations. Program eligibility depends on the full current requirements.",
@@ -320,13 +320,13 @@ def analyze(item, similar_prices=None, category_aspects=None):
                  key=lambda c: (impact[c["status"]], -c["weight"])))]
 
     if score >= 80:
-        summary = "Strong listing — a few tweaks and it is fully optimized."
+        summary = "Few issues were flagged by these checks. Review the recommendations before making changes."
     elif score >= 60:
-        summary = "Decent foundation, but fixable gaps are costing you visibility and sales."
+        summary = "A reasonable starting point, with some listing details worth reviewing."
     elif score >= 40:
-        summary = "Several major gaps — work through the fixes in order."
+        summary = "Several potential issues were found. Work through the highest-priority fixes first."
     else:
-        summary = "This listing needs serious work — start with the fails at the top."
+        summary = "Multiple potential issues were found. Start with the highest-priority fixes and verify each suggestion."
 
     return {"score": score, "summary": summary, "checks": checks, "fixes": fixes,
             "title": title,
