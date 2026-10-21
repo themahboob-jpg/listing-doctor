@@ -61,34 +61,81 @@ SITE_URL = os.getenv("SITE_URL", "https://tool.mappackfix.com")
 
 
 def _item_brief(item):
-    """Small product-facts payload so 'Fix My Listing' can pre-fill the generator."""
-    aspects = {}
+    """Verified product facts used to prefill the listing generator."""
+    aspects = []
+    by_name = {}
     for a in item.get("localizedAspects") or []:
-        n = (a.get("name") or "").strip().lower()
-        if n and n not in aspects:
-            aspects[n] = a.get("value") or ""
+        name = (a.get("name") or "").strip()
+        value = (a.get("value") or "").strip()
+        if name and value:
+            aspects.append({"name": name, "value": value})
+            by_name.setdefault(name.lower(), value)
 
     def pick(*names):
-        for n in names:
-            if aspects.get(n):
-                return aspects[n]
+        for name in names:
+            if by_name.get(name):
+                return by_name[name]
         return ""
 
     price = ""
+    price_currency = ""
     try:
-        price = str((item.get("price") or {}).get("value") or "")
+        price_data = item.get("price") or {}
+        price = str(price_data.get("value") or "")
+        price_currency = str(price_data.get("currency") or "")
     except (TypeError, ValueError):
         pass
+
+    shipping_type, shipping_cost = "", ""
+    shipping = (item.get("shippingOptions") or [])
+    if shipping:
+        option = shipping[0] or {}
+        cost = (option.get("shippingCost") or {})
+        try:
+            amount = float(cost.get("value"))
+            shipping_cost = str(cost.get("value") or "")
+            shipping_type = "free" if amount == 0 else "flat"
+        except (TypeError, ValueError):
+            cost_type = (option.get("shippingCostType") or "").lower()
+            if "calculated" in cost_type:
+                shipping_type = "calculated"
+            elif "flat" in cost_type:
+                shipping_type = "flat"
+
+    returns_option = ""
+    return_terms = item.get("returnTerms") or {}
+    if return_terms.get("returnsAccepted") is True:
+        period = return_terms.get("returnPeriod") or {}
+        try:
+            days = int(period.get("value"))
+            if "DAY" in str(period.get("unit") or "").upper():
+                returns_option = str(days) if days in (14, 30) else ""
+        except (TypeError, ValueError):
+            pass
+    elif return_terms.get("returnsAccepted") is False:
+        returns_option = "none"
+
+    location = item.get("itemLocation") or {}
+    ships_from = ", ".join(str(v).strip() for v in
+                           (location.get("city"), location.get("country")) if v)
+
     return {
         "title": item.get("title") or "",
         "brand": pick("brand"),
         "model": pick("model", "mpn"),
         "color": pick("color", "colour"),
-        "size": pick("storage", "capacity", "size"),
+        "size": pick("storage capacity", "storage", "capacity", "size"),
         "condition": item.get("condition") or "",
         "price": price,
+        "price_currency": price_currency,
+        "specifics": aspects,
+        "category": item.get("categoryPath") or "",
+        "shipping_type": shipping_type,
+        "shipping_cost": shipping_cost,
+        "handling_time": str(item.get("handlingTimeDays") or ""),
+        "returns_option": returns_option,
+        "ships_from": ships_from,
     }
-
 
 @app.route("/")
 def index():
