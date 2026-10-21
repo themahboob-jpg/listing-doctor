@@ -29,7 +29,7 @@
     <a class="logo" href="/" aria-label="Listing Doctor — back to homepage">🩺 <span>Listing Doctor</span></a>
     <p class="eyebrow">FREE EBAY LISTING TOOLKIT</p>
     <h1>Is Your eBay Listing <span class="grad">Losing Sales?</span></h1>
-    <p class="sub">Most lost sales on eBay aren't the product's fault — they're the listing's. Listing Doctor audits yours through eBay's official API, pinpoints every weakness, and generates the fixes. Completely free — try it now.</p>
+    <p class="sub">Listing Doctor checks available eBay listing data, highlights potential issues, and helps you draft improvements. Free to try, with no signup.</p>
     <p class="trust">Free • No Signup • No Credit Card</p>
 
     <div id="audit-pane">
@@ -84,7 +84,7 @@
         <p id="summary" class="summary"></p>
         <p id="rnote" class="rnote" hidden></p>
         <p class="meta"><a id="rurl" href="#" target="_blank" rel="noopener">View listing ↗</a>
-        <span id="rmode"></span> · <span id="rcomp"></span> comparables</p>
+        <span id="rmode"></span> · <span id="rcomp"></span> active asking-price comparables</p>
         <button id="copy" class="copy-btn" type="button">📤 Share my score</button>
       </div>
     </div>
@@ -95,14 +95,9 @@
     <ol id="fixes" class="fixes"></ol>
 
     <div class="emailcap">
-      <strong>📧 Want this report in your inbox?</strong>
-      <p>Plus the occasional seller tip. No spam, unsubscribe anytime.</p>
-      <form id="email-form">
-        <input type="email" id="email" placeholder="you@example.com" required autocomplete="email">
-        <input type="text" name="_gotcha" id="gotcha" style="display:none" tabindex="-1" autocomplete="off">
-        <button type="submit" id="email-go">Send me the report</button>
-      </form>
-      <p id="email-msg" class="email-msg" hidden></p>
+      <strong>💬 Help improve Listing Doctor</strong>
+      <p>Found an incorrect result or have an idea for a feature? Send feedback so we can make the audit more useful for new eBay sellers.</p>
+      <a class="copy-btn" href="/contact">Share feedback ↗</a>
     </div>
 
     <h3>✅ All checks</h3>
@@ -114,7 +109,7 @@
     <h3>Questions? 👇</h3>
     <details>
       <summary>What does the score actually mean?</summary>
-      <p>0–100 across up to 11 checks — title, photos, item specifics, price, shipping, returns, handling time, description, product identifiers, seller trust, condition — weighted by how much each one moves sales. Checks eBay's API can't show are marked “not scored”.</p>
+      <p>0–100 across up to 11 rule-based checks covering listing completeness and potential issues. The score is a prioritization aid, not a prediction of sales or search ranking. Checks eBay's API can't show are marked “not scored”.</p>
     </details>
     <details>
       <summary>Is it really free?</summary>
@@ -198,57 +193,25 @@ document.getElementById('copy').addEventListener('click', async (e) => {
   setTimeout(() => e.target.textContent = '📤 Share my score', 2000);
 });
 
-// Email capture — reuses the MapPackFix Formspree form; `source` keeps
-// Listing Doctor signups distinguishable in the dashboard.
 function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 let lastReport = null;
-document.getElementById('email-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = document.getElementById('email').value.trim();
-  const msg = document.getElementById('email-msg');
-  const btn = document.getElementById('email-go');
-  if (!email) return;
-  btn.disabled = true; msg.hidden = true;
-  try {
-    const r = await fetch('https://formspree.io/f/xbglpbap', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-      body: JSON.stringify({
-        email: email,
-        source: 'listing-doctor',
-        _subject: 'New Listing Doctor report request',
-        _gotcha: document.getElementById('gotcha').value,
-        score: lastReport ? lastReport.score : '',
-        listing_title: lastReport ? lastReport.title : '',
-        item_url: (lastReport && lastReport.item_url) || ''
-      })
-    });
-    if (!r.ok) throw new Error('send failed');
-    msg.textContent = 'Done! Check your inbox 📬';
-    msg.className = 'email-msg ok';
-    document.getElementById('email').value = '';
-  } catch (ex) {
-    msg.textContent = 'Hmm, that didn\u2019t go through — try again in a bit.';
-    msg.className = 'email-msg bad';
-  } finally {
-    msg.hidden = false;
-    btn.disabled = false;
-  }
-});
 
 // ---- Fix My Listing: audit -> generator bridge ----
 // (Standalone "Create a listing" tab removed 2026-10-13 — the generator now
 // runs directly from the audit's item_brief payload, no form needed.)
 function mapCondition(c) {
-  const s = (c || '').toLowerCase();
+  const s = (c || '').toLowerCase().trim();
+  if (!s) return 'unknown';
   if (s.includes('open box')) return 'open_box';
   if (s.includes('refurb')) return 'refurbished';
-  if (s.includes('parts')) return 'for_parts';
+  if (s.includes('parts') || s.includes('not working')) return 'for_parts';
   if (s.includes('excellent')) return 'used_excellent';
-  if (s.includes('used')) return 'used_good';
-  return 'new';
+  if (s === 'new' || s.startsWith('new ') || s.includes('brand new')) return 'new';
+  if (s.includes('used') || s.includes('pre-owned') || s.includes('pre owned') ||
+      s.includes('good') || s.includes('acceptable') || s.includes('very good')) return 'used_good';
+  return 'unknown';
 }
 
 document.getElementById('fix-my-listing').addEventListener('click', async () => {
@@ -271,7 +234,14 @@ document.getElementById('fix-my-listing').addEventListener('click', async () => 
         storage: b.size || '',
         color: b.color || '',
         condition: mapCondition(b.condition),
-        price: b.price || ''
+        price: b.price || '',
+        category: b.category || '',
+        existing_specifics: b.specifics || [],
+        shipping_type: b.shipping_type || '',
+        shipping_cost: b.shipping_cost || '',
+        handling_time: b.handling_time || '',
+        returns_option: b.returns_option || '',
+        ships_from: b.ships_from || ''
       })
     });
     const d = await r.json();
