@@ -123,17 +123,31 @@ def audit():
     try:
         got = client.get_item(url)
         item = got["item"]
-        # price positioning: search by first ~6 title words
+        # Optional enrichment must never make a valid listing audit fail.
+        # Comparable prices are active asking prices, not sold-item values.
+        notes = [got["note"]] if got.get("note") else []
         query = " ".join((item.get("title") or "").split()[:6])
-        sim = (client.similar_prices(query, condition=item.get("condition"))
-               if query else {"prices": [], "count": 0})
-        aspects = client.category_aspects(item.get("categoryId"))
+        try:
+            sim = (client.similar_prices(query, condition=item.get("condition"))
+                   if query else {"prices": [], "count": 0})
+        except Exception:  # noqa: BLE001
+            app.logger.warning("price comparison unavailable for item %s", item_id,
+                               exc_info=True)
+            sim = {"prices": [], "count": 0}
+            notes.append("Comparable active asking prices could not be retrieved; price positioning was not assessed.")
+        try:
+            aspects = client.category_aspects(item.get("categoryId"))
+        except Exception:  # noqa: BLE001
+            app.logger.warning("category aspects unavailable for item %s", item_id,
+                               exc_info=True)
+            aspects = {}
+            notes.append("Category-specific item requirements were unavailable; item-specific checks may be less complete.")
         report = analyze(item, sim["prices"], aspects)
         report["mode"] = got["mode"]
         report["comparables"] = sim["count"]
         report["item_brief"] = _item_brief(item)
-        if got.get("note"):
-            report["note"] = got["note"]
+        if notes:
+            report["note"] = " ".join(notes)
         _cache_set(item_id, report)
         return jsonify(report)
     except ListingNotFound as e:
