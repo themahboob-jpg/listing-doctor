@@ -72,14 +72,16 @@ def generate_listing(d):
     model = _clean(d.get("model"))
     storage = _clean(d.get("storage"))
     color = _clean(d.get("color"))
-    cond_key = (d.get("condition") or "new").strip()
-    cond_label = dict(CONDITIONS).get(cond_key, "New")
+    cond_key = _clean(d.get("condition")) or "unknown"
+    cond_label = dict(CONDITIONS).get(cond_key, "Condition not confirmed")
     features = _split_lines(d.get("features"))[:5]
     included = _split_lines(d.get("included"))[:8]
 
     # ---- eBay-required listing details -----------------------------------
     category = _clean(d.get("category"))
     price = _clean(d.get("price")).lstrip("$").strip()
+    price_currency = _clean(d.get("price_currency")).upper()
+    price_display = (price + " " + price_currency).strip() if price else ""
     try:
         quantity = max(1, int(_clean(d.get("quantity")) or 1))
     except (TypeError, ValueError):
@@ -135,7 +137,19 @@ def generate_listing(d):
         specifics.append({"name": "Color", "value": color})
     if storage:
         specifics.append({"name": "Storage", "value": storage})
-    specifics.append({"name": "Condition", "value": cond_label})
+    if cond_key in dict(CONDITIONS):
+        specifics.append({"name": "Condition", "value": cond_label})
+    # Preserve verified specifics from the source listing without duplicating
+    # fields already represented above or inventing missing product facts.
+    known_names = {s["name"].strip().lower() for s in specifics}
+    for raw in (d.get("existing_specifics") or []):
+        if not isinstance(raw, dict):
+            continue
+        field_name = _clean(raw.get("name"))
+        field_value = _clean(raw.get("value"))
+        if field_name and field_value and field_name.lower() not in known_names:
+            specifics.append({"name": field_name, "value": field_value})
+            known_names.add(field_name.lower())
 
     # ---- description draft (only promises what the seller entered) ---------
     lines = [title, "", "Condition: %s." % cond_label]
@@ -161,7 +175,8 @@ def generate_listing(d):
     if ship_label:
         s = ship_label
         if ship_key == "flat" and ship_cost:
-            s += " ($%s)" % ship_cost
+            ship_currency = _clean(d.get("shipping_currency") or price_currency).upper()
+            s += " (%s)" % " ".join(x for x in (ship_cost, ship_currency) if x)
         sr.append("Shipping: %s" % s)
     if ships_from:
         sr.append("Ships from: %s" % ships_from)
@@ -176,13 +191,13 @@ def generate_listing(d):
     readiness.append({"label": "Title", "status": "ok",
                       "note": "%d/%d characters used." % (len(title), TITLE_LIMIT)})
     readiness.append({"label": "Price", "status": "ok" if price else "missing",
-                      "note": ("$%s \u00d7 %d" % (price, quantity)) if price
+                      "note": ("%s × %d" % (price_display, quantity)) if price
                       else "eBay won't let you list without a price."})
     readiness.append({"label": "Category", "status": "ok" if category else "warn",
                       "note": category if category
                       else "Pick the most specific category on eBay \u2014 wrong category hides your listing and changes fees."})
     readiness.append({"label": "Photos", "status": "warn",
-                      "note": "Upload 8\u201312 clear photos: front, back, angles, close-up of any flaws, and everything included."})
+                      "note": "Upload clear, well-lit photos from multiple angles, including flaws and everything included. eBay allows up to 24 photos in many listing flows."})
     readiness.append({"label": "Item specifics", "status": "ok",
                       "note": "%d drafted \u2014 fill every specific eBay suggests; filtered search is where sales happen." % len(specifics)})
     readiness.append({"label": "Description", "status": "ok",
@@ -195,7 +210,7 @@ def generate_listing(d):
                       if ship_label else "Many buyers filter for free shipping; flat rate is fine for heavy items."})
     readiness.append({"label": "Returns", "status": "ok" if returns_label else "warn",
                       "note": returns_label if returns_label
-                      else "30-day returns are required for Top Rated Plus."})
+                      else "Choose a return policy that fits your business. Top Rated Plus eligibility depends on additional seller and listing requirements."})
 
     # ---- tips --------------------------------------------------------------
     tips = []

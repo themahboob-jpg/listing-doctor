@@ -402,8 +402,8 @@ class EbayClient:
         mid = prices[len(prices) // 2]
         return [p for p in prices if mid * 0.25 <= p <= mid * 4]
 
-    def similar_prices(self, query, limit=50, condition=None):
-        """Competitor prices for price positioning (search API)."""
+    def similar_prices(self, query, limit=50, condition=None, currency=None):
+        """Active asking prices for rough context; optionally match currency."""
         if self.mock:
             return {"prices": list(MOCK_SIMILAR_PRICES), "mode": "mock",
                     "count": len(MOCK_SIMILAR_PRICES)}
@@ -414,8 +414,15 @@ class EbayClient:
         data = self._get("/item_summary/search",
                          {"q": query, "limit": min(limit, 200), "filter": flt})
         prices = []
+        expected_currency = str(currency or "").upper()
         for it in data.get("itemSummaries", []):
-            p = (it.get("price") or {}).get("value")
+            price_data = it.get("price") or {}
+            result_currency = str(price_data.get("currency") or "").upper()
+            # Never compare amounts across currencies. If a currency was
+            # requested, skip results with a different or missing currency.
+            if expected_currency and result_currency != expected_currency:
+                continue
+            p = price_data.get("value")
             try:
                 prices.append(float(p))
             except (TypeError, ValueError):

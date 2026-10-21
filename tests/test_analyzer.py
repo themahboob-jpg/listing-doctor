@@ -95,5 +95,44 @@ class ClientTests(unittest.TestCase):
                          [95, 100, 102, 105, 110])
 
 
+
+class GeneratorRegressionTests(unittest.TestCase):
+    def test_unknown_condition_is_not_guessed_as_new(self):
+        from generator import generate_listing
+        report = generate_listing({"product_name": "Vintage Camera", "condition": "unknown"})
+        self.assertNotIn({"name": "Condition", "value": "New"}, report["specifics"])
+        self.assertIn("Condition not confirmed", report["description"])
+
+    def test_preserves_existing_verified_specifics(self):
+        from generator import generate_listing
+        report = generate_listing({
+            "product_name": "Camera",
+            "brand": "Acme",
+            "existing_specifics": [
+                {"name": "Brand", "value": "Acme"},
+                {"name": "Lens Mount", "value": "X"},
+                {"name": "Model", "value": "C100"},
+            ],
+        })
+        self.assertIn({"name": "Lens Mount", "value": "X"}, report["specifics"])
+        self.assertEqual(sum(1 for s in report["specifics"] if s["name"] == "Brand"), 1)
+        self.assertEqual(sum(1 for s in report["specifics"] if s["name"] == "Model"), 1)
+
+    def test_title_stays_within_ebay_limit(self):
+        from generator import generate_listing
+        report = generate_listing({
+            "product_name": "A very long product name with many words and additional information",
+            "brand": "Brand",
+            "model": "Model number 123",
+            "features": "One feature, another feature, third feature, fourth feature",
+        })
+        self.assertLessEqual(report["title_chars"], 80)
+
+    def test_known_condition_is_preserved(self):
+        from generator import generate_listing
+        report = generate_listing({"product_name": "Camera", "condition": "used_good"})
+        self.assertIn({"name": "Condition", "value": "Used - Good"}, report["specifics"])
+
+
 if __name__ == "__main__":
     unittest.main()
