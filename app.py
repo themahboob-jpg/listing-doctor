@@ -86,11 +86,12 @@ def _item_brief(item):
     except (TypeError, ValueError):
         pass
 
-    shipping_type, shipping_cost = "", ""
+    shipping_type, shipping_cost, shipping_currency = "", "", ""
     shipping = (item.get("shippingOptions") or [])
     if shipping:
         option = shipping[0] or {}
         cost = (option.get("shippingCost") or {})
+        shipping_currency = str(cost.get("currency") or "")
         try:
             amount = float(cost.get("value"))
             shipping_cost = str(cost.get("value") or "")
@@ -132,6 +133,7 @@ def _item_brief(item):
         "category": item.get("categoryPath") or "",
         "shipping_type": shipping_type,
         "shipping_cost": shipping_cost,
+        "shipping_currency": shipping_currency,
         "handling_time": str(item.get("handlingTimeDays")) if item.get("handlingTimeDays") is not None else "",
         "returns_option": returns_option,
         "ships_from": ships_from,
