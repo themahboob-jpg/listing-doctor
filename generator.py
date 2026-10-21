@@ -80,6 +80,8 @@ def generate_listing(d):
     # ---- eBay-required listing details -----------------------------------
     category = _clean(d.get("category"))
     price = _clean(d.get("price")).lstrip("$").strip()
+    price_currency = _clean(d.get("price_currency")).upper()
+    price_display = (price + " " + price_currency).strip() if price else ""
     try:
         quantity = max(1, int(_clean(d.get("quantity")) or 1))
     except (TypeError, ValueError):
@@ -173,7 +175,8 @@ def generate_listing(d):
     if ship_label:
         s = ship_label
         if ship_key == "flat" and ship_cost:
-            s += " ($%s)" % ship_cost
+            ship_currency = _clean(d.get("shipping_currency") or price_currency).upper()
+            s += " (%s)" % " ".join(x for x in (ship_cost, ship_currency) if x)
         sr.append("Shipping: %s" % s)
     if ships_from:
         sr.append("Ships from: %s" % ships_from)
@@ -188,7 +191,7 @@ def generate_listing(d):
     readiness.append({"label": "Title", "status": "ok",
                       "note": "%d/%d characters used." % (len(title), TITLE_LIMIT)})
     readiness.append({"label": "Price", "status": "ok" if price else "missing",
-                      "note": ("$%s \u00d7 %d" % (price, quantity)) if price
+                      "note": ("%s × %d" % (price_display, quantity)) if price
                       else "eBay won't let you list without a price."})
     readiness.append({"label": "Category", "status": "ok" if category else "warn",
                       "note": category if category
