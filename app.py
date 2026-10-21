@@ -53,7 +53,7 @@ def _security_headers(resp):
 client = EbayClient()  # reads keys from env; mock mode if absent
 
 # Bump on every deploy — lets us verify which build is live via /api/health.
-APP_VERSION = "2026-10-13-f"
+APP_VERSION = "2026-10-21-a"
 
 # Public base URL of the deployed app (for social share previews).
 # Change if the subdomain/name differs.
@@ -132,7 +132,7 @@ def _item_brief(item):
         "category": item.get("categoryPath") or "",
         "shipping_type": shipping_type,
         "shipping_cost": shipping_cost,
-        "handling_time": str(item.get("handlingTimeDays") or ""),
+        "handling_time": str(item.get("handlingTimeDays")) if item.get("handlingTimeDays") is not None else "",
         "returns_option": returns_option,
         "ships_from": ships_from,
     }
