@@ -92,16 +92,17 @@ def _item_brief(item):
         option = shipping[0] or {}
         cost = (option.get("shippingCost") or {})
         shipping_currency = str(cost.get("currency") or "")
-        try:
-            amount = float(cost.get("value"))
-            shipping_cost = str(cost.get("value") or "")
-            shipping_type = "free" if amount == 0 else "flat"
-        except (TypeError, ValueError):
-            cost_type = (option.get("shippingCostType") or "").lower()
-            if "calculated" in cost_type:
-                shipping_type = "calculated"
-            elif "flat" in cost_type:
-                shipping_type = "flat"
+        cost_type = (option.get("shippingCostType") or "").lower()
+        if "calculated" in cost_type:
+            shipping_type = "calculated"
+        else:
+            try:
+                amount = float(cost.get("value"))
+                shipping_cost = str(cost.get("value") or "")
+                shipping_type = "free" if amount == 0 else "flat"
+            except (TypeError, ValueError):
+                if "flat" in cost_type:
+                    shipping_type = "flat"
 
     returns_option = ""
     return_terms = item.get("returnTerms") or {}
