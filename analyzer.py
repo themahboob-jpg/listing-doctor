@@ -226,7 +226,7 @@ def analyze(item, similar_prices=None, category_aspects=None):
         r_detail = f"{pval}-day returns accepted"
     elif accepted is False:
         s, f = "warn", ("No returns accepted. Describe the condition precisely and photograph "
-                        "every flaw — buyer confidence drops without a return option.")
+                        "every flaw — a no-returns policy may affect buyer confidence.")
         r_detail = "No returns accepted"
     elif accepted is True:
         s, f = "warn", "Returns accepted, but the return window isn't visible — confirm it's 30 days."
@@ -244,8 +244,8 @@ def analyze(item, similar_prices=None, category_aspects=None):
     if ht is None:
         _check(checks, "handling", "Handling time", "info",
                "Not exposed by eBay's public API",
-               "Can't be read automatically — confirm in Seller Hub that handling time is "
-               "a realistic handling time in Seller Hub. Top Rated Plus eligibility depends on the full current requirements.", 0)
+               "Can't be read automatically — confirm in Seller Hub and set a realistic handling time you can consistently meet. "
+               "Top Rated Plus eligibility depends on the full current requirements.", 0)
     elif ht <= 1:
         _check(checks, "handling", "Handling time", "pass",
                f"{ht} business day(s)", "Ships within 1 business day. This alone does not establish Top Rated Plus eligibility.", 5)
