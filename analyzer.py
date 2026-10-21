@@ -15,13 +15,13 @@ WHY = {
     "title": "eBay matches buyer searches against your title first — a weak title means an invisible listing.",
     "photos": "Buyers can't touch your product, so photos ARE the product. More angles = more trust = more sales.",
     "specifics": "Most buyers filter by brand, size, color… empty specifics means you never appear in filtered search.",
-    "price": "Buyers compare prices in one click — 20%+ off the median and you're either ignored or leaving cash behind.",
+    "price": "Active asking prices provide context, but differences in product, condition, shipping and seller can make comparisons imperfect.",
     "shipping": "Many buyers filter for free shipping, and total cost (item + postage) drives the click.",
-    "returns": "30-day returns are required for Top Rated Plus and build buyer confidence — 'no returns' puts some buyers off.",
+    "returns": "A clear return policy helps set buyer expectations. Top Rated Plus eligibility depends on additional seller and listing requirements.",
     "description": "Thin descriptions mean more questions, more returns, worse rank. Depth sells.",
     "seller": "Buyers compare feedback before buying — a lower positive % pushes them to a competitor.",
     "condition": "Tons of buyers filter by condition before they ever see your listing.",
-    "handling": "Fast dispatch (1 business day) is required for Top Rated Plus and sets buyer expectations.",
+    "handling": "Clear, realistic handling times set buyer expectations. Program eligibility depends on the full current requirements.",
     "identifiers": "UPC/EAN/MPN let eBay match your item to its catalog product, which feeds filters and external shopping search.",
 }
 
@@ -94,13 +94,13 @@ def analyze(item, similar_prices=None, category_aspects=None):
             imgs.append(u)
     n_img = len(imgs)
     if n_img == 0:
-        s, f = "fail", "No photos at all — listings without photos barely sell. Add up to 12."
+        s, f = "fail", "No photos found in the API response. Add clear photos from multiple angles, including any flaws."
     elif n_img < 4:
-        s, f = "warn", f"Only {n_img} photo(s). Top sellers use 8–12 (angles, flaws, scale, packaging)."
+        s, f = "warn", f"Only {n_img} photo(s). Consider adding clear views of the item, flaws, scale and included accessories."
     elif n_img < 8:
-        s, f = "warn", f"{n_img} photos is okay, but 8–12 converts better."
+        s, f = "warn", f"{n_img} photos found. Check whether more angles or detail shots would help buyers assess the item."
     else:
-        s, f = "pass", f"{n_img} photos — good coverage."
+        s, f = "pass", f"{n_img} photos found — review that they are clear and show the actual item."
     size_note = ""
     main_img = item.get("image") or {}
     try:
@@ -115,7 +115,7 @@ def analyze(item, similar_prices=None, category_aspects=None):
         elif longest < 1600 and s == "pass":
             s, f = "warn", (f"{n_img} photos, but the main one is {longest}px on its longest "
                             "side. Upload 1600px+ so buyers can zoom.")
-    _check(checks, "photos", "Photos", s, f"{n_img}/12 photos{size_note}", f, 14)
+    _check(checks, "photos", "Photos", s, f"{n_img} photo(s) found{size_note}", f, 14)
 
     # ---- 3. item specifics -------------------------------------------------
     aspects = item.get("localizedAspects") or []
@@ -159,16 +159,17 @@ def analyze(item, similar_prices=None, category_aspects=None):
         diff = (price - med) / med * 100
         if diff > 20:
             s = "warn"
-            f = (f"${price:.2f} is {diff:.0f}% above the market median "
-                 f"(${med:.2f}, {len(prices)} similar). Justify it in the description "
-                 "or consider matching the market.")
+            f = (f"${price:.2f} is {diff:.0f}% above the median asking price "
+                 f"(${med:.2f} across {len(prices)} active search results). Check that "
+                 "the items are genuinely comparable before changing your price.")
         elif diff < -20:
             s = "warn"
-            f = (f"${price:.2f} is {abs(diff):.0f}% below the market median "
-                 f"(${med:.2f}). You may be leaving money on the table.")
+            f = (f"${price:.2f} is {abs(diff):.0f}% below the median asking price "
+                 f"(${med:.2f} across {len(prices)} active search results). Check product "
+                 "condition, shipping and included accessories before drawing a conclusion.")
         else:
-            s, f = "pass", f"${price:.2f} sits within ±20% of the market median (${med:.2f})."
-        d = f"Your price ${price:.2f} vs median ${med:.2f} ({len(prices)} comparables)"
+            s, f = "pass", f"${price:.2f} is within ±20% of the median asking price (${med:.2f}) in active search results."
+        d = f"Your price ${price:.2f} vs median asking price ${med:.2f} ({len(prices)} active search results)"
     elif price:
         s, f, d = "warn", "Not enough comparable listings to judge price (not counted in score).", f"Price ${price:.2f}"
         price_weight = 0
@@ -217,11 +218,11 @@ def analyze(item, similar_prices=None, category_aspects=None):
         pval = None
     punit = str(period.get("unit") or "").upper()
     if accepted is True and pval == 30 and ("DAY" in punit.upper() or not punit):
-        s, f = "pass", "30-day returns — good for buyer confidence and Top Rated Plus."
+        s, f = "pass", "30-day returns accepted — a clear policy can support buyer confidence. Top Rated Plus eligibility has additional requirements."
         r_detail = "30-day returns accepted"
     elif accepted is True and pval:
-        s, f = "warn", (f"Only {pval}-day returns. 30-day returns are required for "
-                        "Top Rated Plus and build buyer confidence.")
+        s, f = "warn", (f"{pval}-day returns accepted. Consider whether a longer policy fits "
+                        "your business; Top Rated Plus eligibility depends on additional requirements.")
         r_detail = f"{pval}-day returns accepted"
     elif accepted is False:
         s, f = "warn", ("No returns accepted. Describe the condition precisely and photograph "
@@ -244,14 +245,13 @@ def analyze(item, similar_prices=None, category_aspects=None):
         _check(checks, "handling", "Handling time", "info",
                "Not exposed by eBay's public API",
                "Can't be read automatically — confirm in Seller Hub that handling time is "
-               "1 business day.", 0)
+               "a realistic handling time in Seller Hub. Top Rated Plus eligibility depends on the full current requirements.", 0)
     elif ht <= 1:
         _check(checks, "handling", "Handling time", "pass",
-               f"{ht} business day(s)", "Ships within 1 business day — meets Top Rated Plus.", 5)
+               f"{ht} business day(s)", "Ships within 1 business day. This alone does not establish Top Rated Plus eligibility.", 5)
     elif ht <= 3:
         _check(checks, "handling", "Handling time", "warn", f"{ht} business days",
-               f"{ht}-day handling. Cut it to 1 business day if you can — it is part of "
-               "Top Rated Plus.", 5)
+               f"{ht}-day handling. Set a realistic dispatch time you can consistently meet; check current program requirements if targeting Top Rated Plus.", 5)
     else:
         _check(checks, "handling", "Handling time", "fail", f"{ht} business days",
                f"{ht}-day handling is slow; buyers expect dispatch within 1–2 days.", 5)
