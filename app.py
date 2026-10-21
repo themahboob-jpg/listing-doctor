@@ -175,7 +175,9 @@ def audit():
         notes = [got["note"]] if got.get("note") else []
         query = " ".join((item.get("title") or "").split()[:6])
         try:
-            sim = (client.similar_prices(query, condition=item.get("condition"))
+            item_currency = (item.get("price") or {}).get("currency")
+            sim = (client.similar_prices(query, condition=item.get("condition"),
+                                         currency=item_currency)
                    if query else {"prices": [], "count": 0})
         except Exception:  # noqa: BLE001
             app.logger.warning("price comparison unavailable for item %s", item_id,
