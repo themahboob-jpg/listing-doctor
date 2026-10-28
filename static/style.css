@@ -497,3 +497,12 @@ footer{border-top:3px solid transparent;border-image:var(--ebay-stripe) 1;paddin
   position:absolute;width:1px;height:1px;padding:0;margin:-1px;
   overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
 }
+
+
+/* Keep the homepage headline entirely in eBay blue. */
+.hero h1 .ebay-wordmark .ebay-letter{
+  color:var(--ebay-blue-ink);
+}
+.hero h1 .grad::after{
+  background:var(--ebay-blue-ink);
+}
