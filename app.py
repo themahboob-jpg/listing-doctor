@@ -151,14 +151,14 @@ def sitemap():
     base_url = request.url_root.rstrip("/")
     paths = ("", "about", "privacy", "contact")
     entries = "".join(
-        f"  <url><loc>{escape(base_url + '/' + path)}</loc></url>\\n"
+        f"  <url><loc>{escape(base_url + '/' + path)}</loc></url>\n"
         for path in paths
     )
     xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>\\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\\n'
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         f"{entries}"
-        "</urlset>\\n"
+        "</urlset>\n"
     )
     response = make_response(xml)
     response.headers["Content-Type"] = "application/xml; charset=utf-8"
