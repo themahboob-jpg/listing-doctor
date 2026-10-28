@@ -11,6 +11,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
 from urllib.parse import urlencode
+from xml.sax.saxutils import escape
 
 from ebay_client import (EbayClient, ListingNotFound, MOCK_ITEM, MOCK_SIMILAR_PRICES,
                          MOCK_CATEGORY_ASPECTS)
@@ -143,6 +144,25 @@ def _item_brief(item):
 @app.route("/")
 def index():
     return render_template("index.html", mock_mode=client.mock, site_url=SITE_URL)
+
+
+@app.route("/sitemap.xml")
+def sitemap():
+    base_url = request.url_root.rstrip("/")
+    paths = ("", "about", "privacy", "contact")
+    entries = "".join(
+        f"  <url><loc>{escape(base_url + '/' + path)}</loc></url>\n"
+        for path in paths
+    )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{entries}"
+        "</urlset>\n"
+    )
+    response = make_response(xml)
+    response.headers["Content-Type"] = "application/xml; charset=utf-8"
+    return response
 
 
 @app.route("/google50ad9445f7f230d7.html")
