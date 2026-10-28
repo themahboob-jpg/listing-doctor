@@ -5,7 +5,7 @@
   --bg:#fff;
   --card:#fff;
   --border:#d8dee8;
-  --text:#191919;
+  --text:#0053a6;
   --muted:#555f6e;
   --ebay-red:#e53238;
   --ebay-blue:#0064d2;
@@ -140,7 +140,7 @@ a.logo:hover span{text-decoration:underline}
 .dial[data-band=bad]{--ring:#b4232f}
 .scoreinfo{min-width:0}
 .scorecard h2{margin:0 0 8px;font-size:17px;line-height:1.4;overflow-wrap:anywhere}
-.summary{color:#343b45;margin:0 0 10px;font-size:14.5px;line-height:1.55}
+.summary{color:#0053a6;margin:0 0 10px;font-size:14.5px;line-height:1.55}
 .rnote{color:#505d70;margin:0 0 10px;font-size:13px;font-style:italic}
 .meta{font-size:13px;color:var(--muted);margin:0 0 12px}
 .meta a{color:var(--ebay-blue);text-decoration:none}
@@ -167,7 +167,7 @@ h3 .hint{font-weight:400;font-size:13.5px;color:var(--muted)}
   background:var(--grad);color:#fff;font-size:15px;
 }
 .fixes strong{font-size:15px}
-.fixes p{margin:7px 0 0;color:#343b45;font-size:14px;line-height:1.55}
+.fixes p{margin:7px 0 0;color:#0053a6;font-size:14px;line-height:1.55}
 .why{margin-top:10px}
 .why summary{
   cursor:pointer;color:var(--ebay-blue);font-size:13.5px;font-weight:600;list-style:none;
@@ -192,7 +192,7 @@ h3 .hint{font-weight:400;font-size:13.5px;color:var(--muted)}
 .check.fail .badge{background:rgba(180,35,47,.16);color:#b4232f}
 .check.info .badge{background:rgba(89,98,115,.16);color:#596273}
 .check .detail{color:var(--muted);font-size:12.5px;margin:5px 0;line-height:1.5}
-.check .fix{color:#343b45;font-size:13px;margin:5px 0 0;line-height:1.5}
+.check .fix{color:#0053a6;font-size:13px;margin:5px 0 0;line-height:1.5}
 
 /* ---------- done-for-you CTA ---------- */
 .dfy{
@@ -277,11 +277,11 @@ h3 .hint{font-weight:400;font-size:13.5px;color:var(--muted)}
 .gen-desc{
   background:#f7f8fa;border:1px solid var(--border);border-radius:14px;
   padding:16px 18px;font-size:13.5px;line-height:1.65;white-space:pre-wrap;
-  font-family:inherit;color:#343b45;margin:0 0 12px;max-height:320px;overflow-y:auto;
+  font-family:inherit;color:#0053a6;margin:0 0 12px;max-height:320px;overflow-y:auto;
 }
 .gen-tips{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
 .gen-tips li{background:var(--card);border:1px solid var(--border);border-radius:14px;
-  padding:13px 16px;font-size:14px;color:#343b45;line-height:1.55}
+  padding:13px 16px;font-size:14px;color:#0053a6;line-height:1.55}
 .gen-tips li::before{content:"💡 "}
 
 /* ---------- listing readiness checklist ---------- */
@@ -290,7 +290,7 @@ h3 .hint{font-weight:400;font-size:13.5px;color:var(--muted)}
 .readiness{margin:0 0 8px;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
 .readiness li{display:flex;gap:10px;align-items:flex-start;background:var(--card);
   border:1px solid var(--border);border-radius:12px;padding:11px 14px;font-size:13.5px;
-  color:#343b45;line-height:1.5;border-left-width:4px}
+  color:#0053a6;line-height:1.5;border-left-width:4px}
 .readiness li strong{color:#fff}
 .readiness li.ready-ok{border-left-color:#4f7c16}
 .readiness li.ready-warn{border-left-color:#7a5600}
