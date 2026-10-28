@@ -7,11 +7,20 @@
   --border:#d8dee8;
   --text:#191919;
   --muted:#555f6e;
-  --ebay-red:#b4232f;
-  --ebay-blue:#0053a6;
-  --ebay-yellow:#f0ad00;
-  --ebay-green:#4f7c16;
-  --grad:linear-gradient(135deg,var(--ebay-blue),var(--ebay-red));
+  --ebay-red:#e53238;
+  --ebay-blue:#0064d2;
+  --ebay-yellow:#f5af02;
+  --ebay-green:#86b817;
+  --ebay-red-ink:#b4232f;
+  --ebay-blue-ink:#0053a6;
+  --ebay-yellow-ink:#765200;
+  --ebay-green-ink:#416510;
+  --ebay-red-soft:#fff0f0;
+  --ebay-blue-soft:#edf5ff;
+  --ebay-yellow-soft:#fff7dd;
+  --ebay-green-soft:#f2f8e6;
+  --ebay-stripe:linear-gradient(90deg,var(--ebay-red) 0 25%,var(--ebay-blue) 25% 50%,var(--ebay-yellow) 50% 75%,var(--ebay-green) 75% 100%);
+  --grad:linear-gradient(135deg,var(--ebay-blue-ink),var(--ebay-blue));
 }
 html{-webkit-text-size-adjust:100%}
 body{
@@ -325,4 +334,166 @@ footer a:hover{color:var(--text);text-decoration:underline}
   .scorecard{flex-direction:column;text-align:center}
   .checks{grid-template-columns:1fr}
   .fixes li{padding:14px}
+}
+
+
+/* Complete eBay-inspired four-color identity */
+.bg-glow{
+  background:
+    radial-gradient(520px 360px at 12% 9%,rgba(229,50,56,.08),transparent 72%),
+    radial-gradient(620px 400px at 88% 12%,rgba(0,100,210,.08),transparent 72%),
+    radial-gradient(520px 380px at 14% 88%,rgba(245,175,2,.07),transparent 72%),
+    radial-gradient(540px 400px at 88% 90%,rgba(134,184,23,.07),transparent 72%);
+}
+.eyebrow{
+  position:relative;
+  background:#fff;
+  border-color:var(--border);
+  color:var(--ebay-blue-ink);
+}
+.eyebrow::after{
+  content:"";
+  position:absolute;
+  left:17px;
+  right:17px;
+  bottom:0;
+  height:3px;
+  border-radius:3px;
+  background:var(--ebay-stripe);
+}
+.grad{
+  position:relative;
+  display:inline-block;
+  padding-bottom:.08em;
+  background:none;
+  -webkit-background-clip:border-box;
+  background-clip:border-box;
+  color:var(--ebay-blue-ink);
+  -webkit-text-fill-color:var(--ebay-blue-ink);
+}
+.grad::after{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:-.01em;
+  height:4px;
+  border-radius:4px;
+  background:var(--ebay-stripe);
+}
+.ebay-wordmark{white-space:nowrap;display:inline-flex}
+.ebay-wordmark .ebay-e{color:var(--ebay-red-ink)}
+.ebay-wordmark .ebay-b{color:var(--ebay-blue-ink)}
+.ebay-wordmark .ebay-a{color:var(--ebay-yellow-ink)}
+.ebay-wordmark .ebay-y{color:var(--ebay-green-ink)}
+.ebay-wordmark .ebay-letter{font-weight:900;letter-spacing:-.06em}
+
+.audit-form button,.fixbtn,.gen-form button,.dfy-btn,.tab.active{
+  background:linear-gradient(135deg,var(--ebay-blue-ink),var(--ebay-blue));
+  color:#fff;
+  border-bottom:4px solid var(--ebay-yellow);
+  box-shadow:0 7px 22px rgba(0,83,166,.24);
+}
+.audit-form button:hover:not(:disabled),.fixbtn:hover,.dfy-btn:hover{
+  box-shadow:0 10px 28px rgba(0,83,166,.32);
+}
+.audit-form input:focus,.emailcap input[type=email]:focus,
+.gen-form input:focus,.gen-form select:focus,.gen-form textarea:focus{
+  border-color:var(--ebay-blue-ink);
+  box-shadow:0 0 0 4px rgba(0,100,210,.16);
+}
+.demo-link,.meta a,.page a{color:var(--ebay-blue-ink)}
+.trust{
+  position:relative;
+  display:inline-block;
+  color:var(--ebay-green-ink);
+  padding-bottom:8px;
+}
+.trust::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:0;
+  height:3px;border-radius:3px;
+  background:var(--ebay-stripe);
+}
+.mocknote{
+  background:var(--ebay-green-soft);
+  border-color:rgba(134,184,23,.5);
+  color:var(--ebay-green-ink);
+}
+.weight{
+  color:var(--ebay-blue-ink);
+  background:var(--ebay-blue-soft);
+  border-color:rgba(0,100,210,.3);
+}
+.dial[data-band=good]{--ring:var(--ebay-green-ink)}
+.dial[data-band=ok]{--ring:var(--ebay-blue-ink)}
+.dial[data-band=meh]{--ring:var(--ebay-yellow-ink)}
+.dial[data-band=bad]{--ring:var(--ebay-red-ink)}
+.check.pass .badge{background:var(--ebay-green-soft);color:var(--ebay-green-ink)}
+.check.warn .badge{background:var(--ebay-yellow-soft);color:var(--ebay-yellow-ink)}
+.check.fail .badge{background:var(--ebay-red-soft);color:var(--ebay-red-ink)}
+.check.info .badge{background:var(--ebay-blue-soft);color:var(--ebay-blue-ink)}
+.fixes li:nth-child(4n+1){border-left:4px solid var(--ebay-red)}
+.fixes li:nth-child(4n+2){border-left:4px solid var(--ebay-blue)}
+.fixes li:nth-child(4n+3){border-left:4px solid var(--ebay-yellow)}
+.fixes li:nth-child(4n){border-left:4px solid var(--ebay-green)}
+.checks .check:nth-child(4n+1){border-top:3px solid var(--ebay-red)}
+.checks .check:nth-child(4n+2){border-top:3px solid var(--ebay-blue)}
+.checks .check:nth-child(4n+3){border-top:3px solid var(--ebay-yellow)}
+.checks .check:nth-child(4n){border-top:3px solid var(--ebay-green)}
+.gen-specs li:nth-child(4n+1){background:var(--ebay-red-soft);border-color:rgba(229,50,56,.32);color:var(--ebay-red-ink)}
+.gen-specs li:nth-child(4n+2){background:var(--ebay-blue-soft);border-color:rgba(0,100,210,.3);color:var(--ebay-blue-ink)}
+.gen-specs li:nth-child(4n+3){background:var(--ebay-yellow-soft);border-color:rgba(245,175,2,.55);color:var(--ebay-yellow-ink)}
+.gen-specs li:nth-child(4n){background:var(--ebay-green-soft);border-color:rgba(134,184,23,.42);color:var(--ebay-green-ink)}
+.readiness li.ready-ok{border-left-color:var(--ebay-green)}
+.readiness li.ready-warn{border-left-color:var(--ebay-yellow)}
+.readiness li.ready-missing{border-left-color:var(--ebay-red)}
+.faq summary::after{color:var(--ebay-blue-ink)}
+.faq details:nth-of-type(4n+1) summary::after{color:var(--ebay-red-ink)}
+.faq details:nth-of-type(4n+2) summary::after{color:var(--ebay-blue-ink)}
+.faq details:nth-of-type(4n+3) summary::after{color:var(--ebay-yellow-ink)}
+.faq details:nth-of-type(4n) summary::after{color:var(--ebay-green-ink)}
+.faq details{border-top:3px solid var(--ebay-blue)}
+.faq details:nth-of-type(4n+1){border-top-color:var(--ebay-red)}
+.faq details:nth-of-type(4n+2){border-top-color:var(--ebay-blue)}
+.faq details:nth-of-type(4n+3){border-top-color:var(--ebay-yellow)}
+.faq details:nth-of-type(4n){border-top-color:var(--ebay-green)}
+.dfy{
+  background:linear-gradient(#fff,#fff) padding-box,var(--ebay-stripe) border-box;
+  border:2px solid transparent;
+}
+.emailcap{border-top:4px solid var(--ebay-yellow)}
+.gen-card:nth-of-type(4n+1){border-top:3px solid var(--ebay-red)}
+.gen-card:nth-of-type(4n+2){border-top:3px solid var(--ebay-blue)}
+.gen-card:nth-of-type(4n+3){border-top:3px solid var(--ebay-yellow)}
+.gen-card:nth-of-type(4n){border-top:3px solid var(--ebay-green)}
+.page h1::after{
+  content:"";
+  display:block;
+  width:100px;height:4px;
+  margin-top:12px;border-radius:4px;
+  background:var(--ebay-stripe);
+}
+.developer-card{
+  display:flex;gap:18px;align-items:flex-start;
+  background:linear-gradient(#fff,#fff) padding-box,var(--ebay-stripe) border-box;
+  border:2px solid transparent;border-radius:18px;
+  padding:20px;margin:16px 0 28px;
+}
+.developer-avatar{
+  width:54px;height:54px;flex:0 0 54px;border-radius:16px;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--ebay-blue-ink),var(--ebay-red-ink));
+  border-bottom:3px solid var(--ebay-yellow);
+  color:#fff;font-size:18px;font-weight:800;
+}
+.developer-card-content{min-width:0}
+.developer-name{margin:0 0 4px;font-size:20px}
+.developer-role{color:var(--ebay-blue-ink);font-size:.88rem;font-weight:700;margin:4px 0 10px}
+footer{border-top:3px solid transparent;border-image:var(--ebay-stripe) 1;padding-top:12px}
+
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
 }
