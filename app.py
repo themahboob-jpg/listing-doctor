@@ -145,6 +145,11 @@ def index():
     return render_template("index.html", mock_mode=client.mock, site_url=SITE_URL)
 
 
+@app.route("/google50ad9445f7f230d7.html")
+def google_site_verification():
+    return "google-site-verification: google50ad9445f7f230d7.html", 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
 @app.route("/about")
 def about():
     return render_template("about.html", site_url=SITE_URL)
