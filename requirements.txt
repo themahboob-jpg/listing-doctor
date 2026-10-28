@@ -3,3 +3,4 @@ requests
 gunicorn
 flask-limiter
 pillow
+certifi>=2026.10.19
