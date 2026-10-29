@@ -381,12 +381,14 @@ footer a:hover{color:var(--text);text-decoration:underline}
   border-radius:4px;
   background:var(--ebay-stripe);
 }
-.ebay-wordmark{white-space:nowrap;display:inline-flex}
-.ebay-wordmark .ebay-e{color:var(--ebay-red-ink)}
-.ebay-wordmark .ebay-b{color:var(--ebay-blue-ink)}
-.ebay-wordmark .ebay-a{color:var(--ebay-yellow-ink)}
-.ebay-wordmark .ebay-y{color:var(--ebay-green-ink)}
-.ebay-wordmark .ebay-letter{font-weight:900;letter-spacing:-.06em}
+.ebay-wordmark{white-space:nowrap;display:inline-flex;align-items:baseline;vertical-align:baseline}
+/* Match the bright four-colour eBay wordmark shown in the brand reference. */
+.ebay-wordmark .ebay-e{color:var(--ebay-red)}
+.ebay-wordmark .ebay-b{color:var(--ebay-blue)}
+.ebay-wordmark .ebay-a{color:var(--ebay-yellow)}
+.ebay-wordmark .ebay-y{color:var(--ebay-green)}
+.ebay-wordmark .ebay-letter{font-weight:800;letter-spacing:-.065em}
+.ebay-wordmark .ebay-b{font-weight:700}
 
 .audit-form button,.fixbtn,.gen-form button,.dfy-btn,.tab.active{
   background:linear-gradient(135deg,var(--ebay-blue-ink),var(--ebay-blue));
@@ -505,4 +507,19 @@ footer{border-top:3px solid transparent;border-image:var(--ebay-stripe) 1;paddin
 }
 .hero h1 .grad::after{
   background:var(--ebay-blue-ink);
+}
+
+
+/* Accessibility and interaction audit: keep keyboard focus visible and respect motion preferences. */
+:where(a,button,input,select,textarea,summary,[tabindex]:not([tabindex="-1"])):focus-visible{
+  outline:3px solid var(--ebay-blue);
+  outline-offset:3px;
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
 }
