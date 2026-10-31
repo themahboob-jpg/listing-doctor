@@ -15,10 +15,13 @@ returns, and ship-from location. No LLM, no API calls.
 """
 import re
 
+from analyzer import _aspect_key
+
 TITLE_LIMIT = 80
 
 CONDITIONS = [
     ("new", "New"),
+    ("used", "Used"),
     ("open_box", "Open box"),
     ("refurbished", "Certified - Refurbished"),
     ("used_excellent", "Used - Excellent"),
@@ -29,6 +32,7 @@ CONDITIONS = [
 # Appended to the title (eBay's condition field covers the rest).
 CONDITION_PHRASES = {
     "new": "",
+    "used": "",
     "open_box": "Open Box",
     "refurbished": "Certified Refurbished",
     "used_excellent": "Excellent Condition",
@@ -60,12 +64,34 @@ def _clean(s):
     return re.sub(r"\s+", " ", (s or "")).strip()
 
 
+# Words that already state a condition — don't append a second, conflicting one.
+CONDITION_WORDS = re.compile(
+    r"\b(new|used|mint|excellent|good|fair|refurb\w*|renewed|pre-?owned|parts|"
+    r"broken|faulty|open box|nwt|nib|bnib)\b", re.I)
+
+
+def _tidy_title(t):
+    """Remove emoji/symbols and dash/pipe separators buyers don't search for."""
+    t = (t or "").replace("\U0001F50B", " Battery ")  # "100% 🔋" keeps its meaning
+    t = re.sub(r"[^\w\s%&/+.,'\"()-]", " ", t)
+    t = re.sub(r"(?<=\s)[-|~]+(?=\s)", " ", " %s " % t)
+    return _clean(t)
+
+
+def _positive_number(v):
+    try:
+        return float(v) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 def _split_lines(s):
     return [_clean(x) for x in (s or "").replace(",", "\n").split("\n") if _clean(x)]
 
 
 def generate_listing(d):
-    name = _clean(d.get("product_name"))
+    original_name = _clean(d.get("product_name"))
+    name = _tidy_title(original_name)
     if not name:
         raise ValueError("Product name is required.")
     brand = _clean(d.get("brand"))
@@ -115,17 +141,21 @@ def generate_listing(d):
     add(color)
     for f in features:
         add(f)
-    add(CONDITION_PHRASES.get(cond_key, ""))
+    if not CONDITION_WORDS.search(" ".join(parts)):
+        add(CONDITION_PHRASES.get(cond_key, ""))
 
+    # Parts after brand + product name are our additions; dropping those
+    # isn't "trimming" the seller's own words.
+    own_parts = 2 if brand else 1
     title = " ".join(parts)
     trimmed = False
-    while len(title) > TITLE_LIMIT and len(parts) > 3:
-        parts.pop()  # drop lowest-priority part first
+    while len(title) > TITLE_LIMIT and len(parts) > own_parts:
+        parts.pop()  # drop lowest-priority addition first
         title = " ".join(parts)
-        trimmed = True
     if len(title) > TITLE_LIMIT:  # last resort: hard cut, never mid-word
         title = title[:TITLE_LIMIT].rsplit(" ", 1)[0]
         trimmed = True
+    title_changed = title != original_name
 
     # ---- item specifics --------------------------------------------------
     specifics = []
@@ -136,27 +166,39 @@ def generate_listing(d):
     if color:
         specifics.append({"name": "Color", "value": color})
     if storage:
-        specifics.append({"name": "Storage", "value": storage})
+        specifics.append({"name": "Storage Capacity", "value": storage})
     if cond_key in dict(CONDITIONS):
         specifics.append({"name": "Condition", "value": cond_label})
     # Preserve verified specifics from the source listing without duplicating
     # fields already represented above or inventing missing product facts.
-    known_names = {s["name"].strip().lower() for s in specifics}
+    known_names = {_aspect_key(s["name"]) for s in specifics}
     for raw in (d.get("existing_specifics") or []):
         if not isinstance(raw, dict):
             continue
         field_name = _clean(raw.get("name"))
         field_value = _clean(raw.get("value"))
-        if field_name and field_value and field_name.lower() not in known_names:
+        if field_name and field_value and _aspect_key(field_name) not in known_names:
             specifics.append({"name": field_name, "value": field_value})
-            known_names.add(field_name.lower())
+            known_names.add(_aspect_key(field_name))
 
     # ---- description draft (only promises what the seller entered) ---------
-    lines = [title, "", "Condition: %s." % cond_label]
+    # Facts come from the listing's own specifics; [brackets] are for the
+    # seller to fill in, never invented claims.
+    lines = [title, "", "Condition: %s." % cond_label,
+             "[Describe the exact condition: any scratches, dents, wear or faults, "
+             "and whether everything works as it should.]"]
     if features:
         lines += ["", "Key features:"] + ["\u2022 " + f for f in features]
+    spec_lines = ["\u2022 %s: %s" % (x["name"], x["value"]) for x in specifics
+                  if x["name"].lower() != "condition"][:15]
+    if spec_lines:
+        lines += ["", "Specifications:"] + spec_lines
+    lines += ["", "What's included:"]
     if included:
-        lines += ["", "What's included:"] + ["\u2022 " + x for x in included]
+        lines += ["\u2022 " + x for x in included]
+    else:
+        lines.append("[List everything in the box: the item, cables, chargers, manuals, "
+                     "original packaging. If something is not included, say so.]")
     ship_lines = []
     if handling:
         ship_lines.append("Ships within %s with tracking." % handling)
@@ -190,18 +232,30 @@ def generate_listing(d):
     readiness = []
     readiness.append({"label": "Title", "status": "ok",
                       "note": "%d/%d characters used." % (len(title), TITLE_LIMIT)})
-    readiness.append({"label": "Price", "status": "ok" if price else "missing",
-                      "note": ("%s × %d" % (price_display, quantity)) if price
-                      else "eBay won't let you list without a price."})
+    if not price:
+        readiness.append({"label": "Price", "status": "missing",
+                          "note": "eBay won't let you list without a price."})
+    elif not _positive_number(price):
+        readiness.append({"label": "Price", "status": "missing",
+                          "note": "Price must be a number above zero."})
+    else:
+        readiness.append({"label": "Price", "status": "ok",
+                          "note": "%s × %d" % (price_display, quantity)})
     readiness.append({"label": "Category", "status": "ok" if category else "warn",
                       "note": category if category
                       else "Pick the most specific category on eBay \u2014 wrong category hides your listing and changes fees."})
     readiness.append({"label": "Photos", "status": "warn",
                       "note": "Upload clear, well-lit photos from multiple angles, including flaws and everything included. eBay allows up to 24 photos in many listing flows."})
-    readiness.append({"label": "Item specifics", "status": "ok",
-                      "note": "%d drafted \u2014 fill every specific eBay suggests; filtered search is where sales happen." % len(specifics)})
-    readiness.append({"label": "Description", "status": "ok",
-                      "note": "Draft ready below \u2014 add measurements or compatibility notes if they matter for this item."})
+    missing_specs = [_clean(x) for x in (d.get("missing_specifics") or [])
+                     if isinstance(x, str) and _clean(x)]
+    if missing_specs:
+        readiness.append({"label": "Item specifics", "status": "missing",
+                          "note": "Required by this category and still empty: %s." % ", ".join(missing_specs[:6])})
+    else:
+        readiness.append({"label": "Item specifics", "status": "ok",
+                          "note": "%d drafted \u2014 fill every specific eBay suggests; filtered search is where sales happen." % len(specifics)})
+    readiness.append({"label": "Description", "status": "warn",
+                      "note": "Draft ready below \u2014 replace every [bracketed] line with details about your actual item before posting."})
     readiness.append({"label": "Handling time", "status": "ok" if handling else "warn",
                       "note": handling if handling
                       else "Set it on eBay \u2014 late shipment hurts your seller rating."})
@@ -219,8 +273,13 @@ def generate_listing(d):
             "Title uses %d/%d chars \u2014 add 1\u20132 more keywords "
             "(model number, size, bundle) to use the full space." % (len(title), TITLE_LIMIT))
     if trimmed:
-        tips.append("Title was trimmed to fit %d chars \u2014 dropped words were "
-                    "lowest priority; the important keywords survived." % TITLE_LIMIT)
+        tips.append("Your title was over %d chars, so the last words were cut \u2014 "
+                    "check the important keywords are still in it." % TITLE_LIMIT)
+    if not title_changed:
+        tips.append("Your title already covers the facts we could verify \u2014 no rewrite needed.")
+    elif name != original_name:
+        tips.append("Removed emoji and separator symbols \u2014 buyers don't search for them "
+                    "and they use up title space.")
     if not category:
         tips.append("Search your exact item on eBay, open a sold listing, and copy its category path \u2014 that's the category eBay expects.")
     if ship_key == "free":
@@ -228,9 +287,11 @@ def generate_listing(d):
     if returns_label == "No returns accepted":
         tips.append("\u201cNo returns\u201d lowers buyer confidence \u2014 describe the condition precisely and photograph every flaw.")
     if not features:
-        tips.append("Add 2\u20133 key features above and regenerate \u2014 specifics sell the click.")
+        tips.append("Add 2\u20133 selling points to the description (battery health, "
+                    "accessories, upgrades) \u2014 specifics sell the click.")
 
     return {"title": title, "title_chars": len(title), "trimmed": trimmed,
+            "title_changed": title_changed,
             "specifics": specifics, "description": description,
             "shipping_returns": shipping_returns, "readiness": readiness,
             "tips": tips}

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Listing Doctor — Free eBay Listing Audit</title>
 <meta name="description" content="Free eBay listing audit using available eBay data. Check a listing score, review potential issues, and draft improvements. No signup.">
-<link rel="icon" type="image/png" href="/static/logo.png">
+<link rel="icon" type="image/png" href="/static/favicon.png">
 <!-- Social share preview -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Listing Doctor">
@@ -19,15 +19,7 @@
 <meta name="twitter:title" content="Listing Doctor — Free eBay Listing Audit">
 <meta name="twitter:description" content="Free eBay listing audit. Review potential issues in your title, item specifics, pricing and shipping, then draft improvements.">
 <meta name="twitter:image" content="{{ site_url }}/static/og-banner.png">
-<link rel="stylesheet" href="/static/style.css">
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-GWC4V0GF0F"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-GWC4V0GF0F');
-</script>
+<link rel="stylesheet" href="/static/style.css?v={{ asset_v }}">
 </head>
 <body>
 <div class="bg-glow"></div>
@@ -193,7 +185,8 @@ demoBtn.addEventListener('click', () => runAudit('/api/demo', {}));
 document.getElementById('copy').addEventListener('click', async (e) => {
   const s = document.getElementById('score').textContent;
   const t = document.getElementById('rtitle').textContent;
-  const shareUrl = `${location.origin}/share?s=${encodeURIComponent(s)}&t=${encodeURIComponent(t.slice(0, 70))}`;
+  // Signed by the server so nobody can mint fake scores under our name.
+  const shareUrl = (lastReport && lastReport.share_url) || location.origin;
   const txt = `My eBay listing scored ${s}/100 on Listing Doctor 🩺 "${t}" — is YOURS losing sales? Check free: ${shareUrl}`;
   try { await navigator.clipboard.writeText(txt); }
   catch { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
@@ -217,8 +210,9 @@ function mapCondition(c) {
   if (s.includes('parts') || s.includes('not working')) return 'for_parts';
   if (s.includes('excellent')) return 'used_excellent';
   if (s === 'new' || s.startsWith('new ') || s.includes('brand new')) return 'new';
-  if (s.includes('used') || s.includes('pre-owned') || s.includes('pre owned') ||
-      s.includes('good') || s.includes('acceptable') || s.includes('very good')) return 'used_good';
+  if (s.includes('good') || s.includes('acceptable')) return 'used_good';
+  // Plain "Used" says nothing about grade — don't claim one for the seller.
+  if (s.includes('used') || s.includes('pre-owned') || s.includes('pre owned')) return 'used';
   return 'unknown';
 }
 
@@ -246,6 +240,7 @@ document.getElementById('fix-my-listing').addEventListener('click', async () => 
         price_currency: b.price_currency || '',
         category: b.category || '',
         existing_specifics: b.specifics || [],
+        missing_specifics: lastReport.missing_specifics || [],
         shipping_type: b.shipping_type || '',
         shipping_cost: b.shipping_cost || '',
         shipping_currency: b.shipping_currency || '',
@@ -373,5 +368,6 @@ function render(d) {
   rep.scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 </script>
+{% include "_analytics.html" %}
 </body>
 </html>

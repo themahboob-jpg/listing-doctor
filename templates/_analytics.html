@@ -1,0 +1,36 @@
+<!-- Google Analytics loads only after the visitor accepts (GDPR / UK GDPR). -->
+<div id="consent" class="consent" hidden>
+  <p>We use Google Analytics cookies to see how the tool is used. <a href="/privacy">Privacy</a></p>
+  <div class="consent-actions">
+    <button type="button" id="consent-no" class="consent-no">Decline</button>
+    <button type="button" id="consent-yes" class="consent-yes">Accept</button>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'ld-consent';
+  function get() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function set(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+  function loadGA() {
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', 'G-GWC4V0GF0F');
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=G-GWC4V0GF0F';
+    document.head.appendChild(s);
+  }
+  var box = document.getElementById('consent');
+  var choice = get();
+  if (choice === 'yes') { loadGA(); return; }
+  if (choice === 'no') return;
+  box.hidden = false;
+  document.getElementById('consent-yes').addEventListener('click', function () {
+    set('yes'); box.hidden = true; loadGA();
+  });
+  document.getElementById('consent-no').addEventListener('click', function () {
+    set('no'); box.hidden = true;
+  });
+})();
+</script>

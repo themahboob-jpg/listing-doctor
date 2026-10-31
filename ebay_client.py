@@ -18,8 +18,16 @@ OAUTH_SCOPE = "https://api.ebay.com/oauth/api_scope"
 # listings). The Shopping API takes the numeric ItemID directly and needs only
 # the app key — no OAuth.
 SHOPPING_URL = "https://open.api.ebay.com/shopping"
-TAXONOMY_URL = ("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/"
+TAXONOMY_URL = ("https://api.ebay.com/commerce/taxonomy/v1/category_tree/{tree}/"
                 "get_item_aspects_for_category")
+# Category ids and aspect names belong to the listing's own marketplace —
+# a German listing's specifics must be checked against the German tree.
+CATEGORY_TREES = {
+    "EBAY_US": "0", "EBAY_MOTORS_US": "100", "EBAY_CA": "2", "EBAY_GB": "3",
+    "EBAY_AU": "15", "EBAY_AT": "16", "EBAY_FR": "71", "EBAY_DE": "77",
+    "EBAY_IT": "101", "EBAY_BE": "123", "EBAY_NL": "146", "EBAY_ES": "186",
+    "EBAY_CH": "193", "EBAY_IE": "205",
+}
 ASPECTS_TTL = 24 * 3600
 
 NOT_FOUND_MSG = ("Listing not found on eBay. Double-check the item ID — "
@@ -355,19 +363,23 @@ class EbayClient:
                 recommended.append(name)
         return {"required": required, "recommended": recommended}
 
-    def category_aspects(self, category_id):
+    def category_aspects(self, category_id, marketplace_id=None):
         """Required / recommended item specifics for a category (Taxonomy API), or None."""
         cid = str(category_id or "").strip()
         if not cid.isdigit():
             return None
+        tree = CATEGORY_TREES.get(str(marketplace_id or "EBAY_US").upper())
+        if tree is None:
+            return None
         if self.mock:
             return dict(MOCK_CATEGORY_ASPECTS) if cid == MOCK_ITEM["categoryId"] else None
-        hit = self._aspects_cache.get(cid)
+        key = f"{tree}:{cid}"
+        hit = self._aspects_cache.get(key)
         if hit and time.time() - hit[0] < ASPECTS_TTL:
             return hit[1]
         try:
             r = requests.get(
-                TAXONOMY_URL,
+                TAXONOMY_URL.format(tree=tree),
                 headers={"Authorization": f"Bearer {self._app_token()}",
                          "Accept": "application/json"},
                 params={"category_id": cid}, timeout=20)
@@ -378,7 +390,7 @@ class EbayClient:
             return None
         if len(self._aspects_cache) > 300:
             self._aspects_cache.clear()
-        self._aspects_cache[cid] = (time.time(), result)
+        self._aspects_cache[key] = (time.time(), result)
         return result
 
     @staticmethod
@@ -403,7 +415,7 @@ class EbayClient:
         return [p for p in prices if mid * 0.25 <= p <= mid * 4]
 
     def similar_prices(self, query, limit=50, condition=None, currency=None):
-        """Active asking prices for rough context; optionally match currency."""
+        """Active asking totals (price + first shipping option); optionally match currency."""
         if self.mock:
             return {"prices": list(MOCK_SIMILAR_PRICES), "mode": "mock",
                     "count": len(MOCK_SIMILAR_PRICES)}
@@ -422,10 +434,17 @@ class EbayClient:
             # requested, skip results with a different or missing currency.
             if expected_currency and result_currency != expected_currency:
                 continue
-            p = price_data.get("value")
             try:
-                prices.append(float(p))
+                total = float(price_data.get("value"))
+            except (TypeError, ValueError):
+                continue
+            # Buyers compare item + postage, so comparables are totals too.
+            ship = ((it.get("shippingOptions") or [{}])[0] or {}).get("shippingCost") or {}
+            try:
+                if str(ship.get("currency") or result_currency).upper() == result_currency:
+                    total += float(ship.get("value") or 0)
             except (TypeError, ValueError):
                 pass
+            prices.append(total)
         prices = self._trim_outliers(prices)
         return {"prices": prices, "mode": "live", "count": len(prices)}

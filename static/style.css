@@ -523,3 +523,22 @@ footer{border-top:3px solid transparent;border-image:var(--ebay-stripe) 1;paddin
     transition-duration:.01ms!important;
   }
 }
+
+/* ---- analytics consent banner ---- */
+.consent{
+  position:fixed; left:16px; right:16px; bottom:16px; z-index:50;
+  max-width:560px; margin:0 auto; padding:14px 16px;
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px;
+  background:var(--card); color:var(--muted);
+  border:1px solid var(--border); border-radius:12px;
+  box-shadow:0 8px 28px rgba(0,0,0,.12); font-size:.9rem;
+}
+.consent[hidden]{display:none}
+.consent p{margin:0; flex:1 1 240px}
+.consent a{color:var(--ebay-blue-ink)}
+.consent-actions{display:flex; gap:8px}
+.consent button{
+  font:inherit; padding:8px 16px; border-radius:8px; cursor:pointer;
+  border:1px solid var(--border); background:var(--card); color:var(--text);
+}
+.consent .consent-yes{background:var(--ebay-blue); border-color:var(--ebay-blue); color:#fff}

@@ -3,6 +3,8 @@
 Run:  python3 app.py   ->  http://localhost:5000
 Env:  EBAY_CLIENT_ID / EBAY_CLIENT_SECRET  (without them the app runs in mock/demo mode)
 """
+import hashlib
+import hmac
 import os
 import time
 
@@ -21,8 +23,17 @@ from share_card import make_score_card
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 7 * 24 * 3600  # static URLs carry ?v=
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
-limiter = Limiter(get_remote_address, app=app,
+
+
+def _client_ip():
+    """Visitor IP behind Cloudflare -> Render. The rightmost X-Forwarded-For hop
+    is a Cloudflare edge shared by many visitors, so prefer CF-Connecting-IP."""
+    return request.headers.get("CF-Connecting-IP") or get_remote_address()
+
+
+limiter = Limiter(_client_ip, app=app,
                   default_limits=["300 per day", "60 per hour"],
                   storage_uri="memory://")
 
@@ -50,15 +61,61 @@ def _security_headers(resp):
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("X-Frame-Options", "DENY")
     resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    resp.headers.setdefault("Content-Security-Policy", CSP)
     return resp
+
+
+CSP = "; ".join([
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com",
+    "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com",
+    "img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com",
+    "style-src 'self' 'unsafe-inline'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+])
 client = EbayClient()  # reads keys from env; mock mode if absent
 
 # Bump on every deploy — lets us verify which build is live via /api/health.
-APP_VERSION = "2026-10-21-a"
+APP_VERSION = "2026-10-31-a"
 
 # Public base URL of the deployed app (for social share previews).
 # Change if the subdomain/name differs.
 SITE_URL = os.getenv("SITE_URL", "https://tool.mappackfix.com")
+
+# Share links are signed so a score card can't be forged with any number/text.
+SHARE_SECRET = (os.getenv("SHARE_SECRET") or os.getenv("EBAY_CLIENT_SECRET")
+                or "listing-doctor-dev").encode()
+
+
+def _share_sig(score, title):
+    msg = f"{score}|{title}".encode()
+    return hmac.new(SHARE_SECRET, msg, hashlib.sha256).hexdigest()[:20]
+
+
+def _share_query(score, title):
+    title = (title or "").strip()[:70]
+    return urlencode({"s": score, "t": title, "k": _share_sig(score, title)})
+
+
+def _signed_share_args():
+    """(score, title) from a share URL, or None if missing/forged."""
+    try:
+        score = int(request.args.get("s", ""))
+    except (TypeError, ValueError):
+        return None
+    title = (request.args.get("t") or "").strip()[:70]
+    sig = request.args.get("k") or ""
+    if not 0 <= score <= 100 or not hmac.compare_digest(sig, _share_sig(score, title)):
+        return None
+    return score, title
+
+
+@app.context_processor
+def _template_globals():
+    return {"asset_v": APP_VERSION}
 
 
 def _item_brief(item):
@@ -124,10 +181,10 @@ def _item_brief(item):
 
     return {
         "title": item.get("title") or "",
-        "brand": pick("brand"),
-        "model": pick("model", "mpn"),
-        "color": pick("color", "colour"),
-        "size": pick("storage capacity", "storage", "capacity", "size"),
+        "brand": pick("brand", "marke", "marque", "marca"),
+        "model": pick("model", "modell", "modèle", "modello", "modelo", "mpn", "herstellernummer"),
+        "color": pick("color", "colour", "farbe", "couleur", "colore"),
+        "size": pick("storage capacity", "speicherkapazität", "storage", "capacity", "size"),
         "condition": item.get("condition") or "",
         "price": price,
         "price_currency": price_currency,
@@ -163,6 +220,21 @@ def sitemap():
     response = make_response(xml)
     response.headers["Content-Type"] = "application/xml; charset=utf-8"
     return response
+
+
+@app.route("/robots.txt")
+def robots():
+    body = ("User-agent: *\n"
+            "Disallow: /api/\n"
+            "Disallow: /share\n"
+            "\n"
+            "Sitemap: %s/sitemap.xml\n" % SITE_URL)
+    return body, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return app.send_static_file("favicon.png")
 
 
 @app.route("/google50ad9445f7f230d7.html")
@@ -213,7 +285,8 @@ def audit():
             sim = {"prices": [], "count": 0}
             notes.append("Comparable active asking prices could not be retrieved; price positioning was not assessed.")
         try:
-            aspects = client.category_aspects(item.get("categoryId"))
+            aspects = client.category_aspects(item.get("categoryId"),
+                                             item.get("listingMarketplaceId"))
         except Exception:  # noqa: BLE001
             app.logger.warning("category aspects unavailable for item %s", item_id,
                                exc_info=True)
@@ -223,6 +296,7 @@ def audit():
         report["mode"] = got["mode"]
         report["comparables"] = sim["count"]
         report["item_brief"] = _item_brief(item)
+        report["share_url"] = f"{SITE_URL}/share?{_share_query(report['score'], report['title'])}"
         if notes:
             report["note"] = " ".join(notes)
         _cache_set(item_id, report)
@@ -243,6 +317,7 @@ def demo():
     report["mode"] = "demo"
     report["comparables"] = len(MOCK_SIMILAR_PRICES)
     report["item_brief"] = _item_brief(item)
+    report["share_url"] = f"{SITE_URL}/share?{_share_query(report['score'], report['title'])}"
     return jsonify(report)
 
 
@@ -266,14 +341,11 @@ def contact():
 def share():
     """Shareable score page — OG tags point at a generated score card image,
     so the link unfurls with the score on WhatsApp/Facebook/X."""
-    try:
-        score = int(request.args.get("s", ""))
-    except (TypeError, ValueError):
+    args = _signed_share_args()
+    if args is None:
         return redirect("/", 302)
-    if not 0 <= score <= 100:
-        return redirect("/", 302)
-    title = (request.args.get("t") or "").strip()[:70]
-    q = urlencode({"s": score, "t": title})
+    score, title = args
+    q = _share_query(score, title)
     return render_template("share.html", score=score, title=title,
                            img_url=f"{SITE_URL}/share-img?{q}",
                            page_url=f"{SITE_URL}/share?{q}", site_url=SITE_URL)
@@ -283,13 +355,10 @@ def share():
 @limiter.limit("30 per minute")
 def share_img():
     """Render the 1200x630 score card PNG on the fly (nothing stored)."""
-    try:
-        score = int(request.args.get("s", ""))
-    except (TypeError, ValueError):
-        return jsonify({"error": "bad score"}), 400
-    if not 0 <= score <= 100:
-        return jsonify({"error": "bad score"}), 400
-    title = (request.args.get("t") or "").strip()[:70]
+    args = _signed_share_args()
+    if args is None:
+        return jsonify({"error": "bad share link"}), 400
+    score, title = args
     resp = make_response(make_score_card(score, title))
     resp.headers["Content-Type"] = "image/png"
     resp.headers["Cache-Control"] = "public, max-age=86400"

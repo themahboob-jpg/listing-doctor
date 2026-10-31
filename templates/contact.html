@@ -5,16 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contact Us — Listing Doctor</title>
 <meta name="description" content="Contact Listing Doctor's developer, Mahboob Alam, for questions, feedback, or bug reports.">
-<link rel="icon" type="image/png" href="/static/logo.png">
-<link rel="stylesheet" href="/static/style.css">
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-GWC4V0GF0F"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-GWC4V0GF0F');
-</script>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="stylesheet" href="/static/style.css?v={{ asset_v }}">
 </head>
 <body>
 <div class="bg-glow"></div>
@@ -40,5 +32,6 @@
   </main>
   <footer>Made for sellers 📦 · Listing Doctor<br><a href="/about">About</a> · <a href="/privacy">Privacy</a> · <a href="/contact">Contact</a></footer>
 </div>
+{% include "_analytics.html" %}
 </body>
 </html>

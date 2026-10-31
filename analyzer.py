@@ -49,15 +49,47 @@ def _real(v):
     return _norm(v) not in ("", "does not apply", "n a", "na", "unknown")
 
 
+# Spelling / language variants of the same item specific, normalised to one
+# key so "Colour" or "Farbe" counts as "Color".
+ASPECT_ALIASES = {
+    "colour": "color", "farbe": "color", "couleur": "color", "colore": "color",
+    "marke": "brand", "marque": "brand", "marca": "brand",
+    "modell": "model", "modele": "model", "modello": "model", "modelo": "model",
+    "herstellernummer": "mpn",
+    "speicherkapazitat": "storage capacity", "speicherkapazitaet": "storage capacity",
+}
+
+
+def _aspect_key(name):
+    n = _norm(str(name or "").lower().replace("ä", "a").replace("è", "e").replace("é", "e"))
+    return ASPECT_ALIASES.get(n, n)
+
+
+# Upper-case tokens that are normal in titles, not shouting.
+ACRONYMS = {"usb", "led", "lcd", "oled", "hdmi", "ssd", "hdd", "ram", "nfc", "gps",
+            "dvd", "cd", "pc", "tv", "uk", "usa", "eu", "oem", "nwt", "nib", "bnib",
+            "nos", "lot", "xl", "xxl", "xs", "mens", "ios", "wifi", "lte", "amd",
+            "nvidia", "asus", "hp", "lg", "jbl", "bmw", "nike", "ugg", "vtg"}
+
+
+def _shouting(word):
+    """True for an ALL-CAPS ordinary word (e.g. 'AMAZING'), not a spec like 128GB."""
+    core = re.sub(r"[^A-Za-z0-9]", "", word)
+    return (len(core) >= 4 and core.isalpha() and core.isupper()
+            and core.lower() not in ACRONYMS)
+
+
 def analyze(item, similar_prices=None, category_aspects=None):
     checks = []
     title = (item.get("title") or "").strip()
 
     # ---- 1. title -------------------------------------------------------
     words = title.split()
-    caps_words = [w for w in words if len(w) > 2 and w.isupper()]
+    caps_words = [w for w in words if _shouting(w)]
     seen, dupes = set(), 0
     for w in [x.lower() for x in words]:
+        if not re.search(r"[a-z0-9]", w):
+            continue  # separators like "-" or "|" aren't repeated keywords
         if w in seen:
             dupes += 1
         seen.add(w)
@@ -128,11 +160,12 @@ def analyze(item, similar_prices=None, category_aspects=None):
     else:
         s, f = "pass", f"{n_asp} specifics filled."
     sp_detail = f"{n_asp} specifics: " + ", ".join(a.get("name", "") for a in aspects[:6])
+    req_missing = []
     if category_aspects and n_asp:
-        have = {_norm(a.get("name")) for a in aspects}
-        req_missing = [n for n in category_aspects.get("required", []) if _norm(n) not in have]
+        have = {_aspect_key(a.get("name")) for a in aspects}
+        req_missing = [n for n in category_aspects.get("required", []) if _aspect_key(n) not in have]
         rec_all = category_aspects.get("recommended", [])
-        rec_missing = [n for n in rec_all if _norm(n) not in have]
+        rec_missing = [n for n in rec_all if _aspect_key(n) not in have]
         rec_filled = len(rec_all) - len(rec_missing)
         ratio = rec_filled / len(rec_all) if rec_all else 1.0
         sp_detail += f" — category check: {rec_filled}/{len(rec_all)} recommended filled"
@@ -147,29 +180,39 @@ def analyze(item, similar_prices=None, category_aspects=None):
     _check(checks, "specifics", "Item specifics", s, sp_detail, f, 14)
 
     # ---- 4. price positioning ----------------------------------------------
+    # Compared as item + postage, because that is the total a buyer sees.
     price = None
     try:
         price = float((item.get("price") or {}).get("value"))
     except (TypeError, ValueError):
         pass
+    ship_cost = 0.0
+    for sh in item.get("shippingOptions") or []:
+        try:
+            ship_cost = float(((sh or {}).get("shippingCost") or {}).get("value") or 0)
+            break
+        except (TypeError, ValueError):
+            continue
     prices = [p for p in (similar_prices or []) if p and p > 0]
     price_weight = 14
     if price and len(prices) >= 5:
+        total = price + ship_cost
+        label = f"${total:.2f} incl. ${ship_cost:.2f} shipping" if ship_cost else f"${total:.2f} (free shipping)"
         med = median(prices)
-        diff = (price - med) / med * 100
+        diff = (total - med) / med * 100
         if diff > 20:
             s = "warn"
-            f = (f"${price:.2f} is {diff:.0f}% above the median asking price "
+            f = (f"{label} is {diff:.0f}% above the median total "
                  f"(${med:.2f} across {len(prices)} active search results). Check that "
-                 "the items are genuinely comparable before changing your price.")
+                 "the items are genuinely comparable before changing your price or postage.")
         elif diff < -20:
             s = "warn"
-            f = (f"${price:.2f} is {abs(diff):.0f}% below the median asking price "
+            f = (f"{label} is {abs(diff):.0f}% below the median total "
                  f"(${med:.2f} across {len(prices)} active search results). Check product "
-                 "condition, shipping and included accessories before drawing a conclusion.")
+                 "condition and included accessories before drawing a conclusion.")
         else:
-            s, f = "pass", f"${price:.2f} is within ±20% of the median asking price (${med:.2f}) in active search results."
-        d = f"Your price ${price:.2f} vs median asking price ${med:.2f} ({len(prices)} active search results)"
+            s, f = "pass", f"{label} is within ±20% of the median total (${med:.2f}) in active search results."
+        d = f"Your total {label} vs median ${med:.2f} item + shipping ({len(prices)} active search results)"
     elif price:
         s, f, d = "warn", "Not enough comparable listings to judge price (not counted in score).", f"Price ${price:.2f}"
         price_weight = 0
@@ -287,8 +330,15 @@ def analyze(item, similar_prices=None, category_aspects=None):
     except (TypeError, ValueError):
         fb_pct = 0
     fb_score = seller.get("feedbackScore", 0)
-    if fb_pct >= 99:
-        s, f = "pass", f"{fb_pct}% positive ({fb_score} feedback) — trusted seller."
+    try:
+        fb_count = int(fb_score)
+    except (TypeError, ValueError):
+        fb_count = 0
+    if fb_pct >= 99 and fb_count >= 100:
+        s, f = "pass", f"{fb_pct}% positive across {fb_count} ratings — an established record."
+    elif fb_pct >= 99:
+        s, f = "pass", (f"{fb_pct}% positive, but only {fb_count} ratings — a short track record. "
+                        "Detailed photos and a clear description matter more until it grows.")
     elif fb_pct >= 97:
         s, f = "warn", f"{fb_pct}% positive — below the 99% buyers expect. Fix issues fast."
     elif fb_pct > 0:
@@ -329,5 +379,5 @@ def analyze(item, similar_prices=None, category_aspects=None):
         summary = "Multiple potential issues were found. Start with the highest-priority fixes and verify each suggestion."
 
     return {"score": score, "summary": summary, "checks": checks, "fixes": fixes,
-            "title": title,
+            "title": title, "missing_specifics": req_missing,
             "item_url": item.get("itemWebUrl", "")}
